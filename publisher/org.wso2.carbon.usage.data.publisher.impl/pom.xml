@@ -103,8 +103,7 @@
                         <Private-Package>
                             org.wso2.carbon.usage.data.publisher.impl.internal.*,
                             org.apache.http.*,
-                            org.apache.commons.codec.*,
-                            mozilla
+                            org.apache.commons.codec.*
                         </Private-Package>
                         <Import-Package>
                             org.wso2.carbon.usage.data.publisher.api.*;version="${project.version}",

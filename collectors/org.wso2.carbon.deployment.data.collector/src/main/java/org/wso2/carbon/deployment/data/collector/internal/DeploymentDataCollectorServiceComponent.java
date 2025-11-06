@@ -50,8 +50,8 @@ public class DeploymentDataCollectorServiceComponent {
     private static final Log log = LogFactory.getLog(DeploymentDataCollectorServiceComponent.class);
 
     // Hardcoded configuration
-    private static final long INITIAL_DELAY_SECONDS = 0; // 1 minute
-    private static final long INTERVAL_SECONDS = 30; // 24 hours
+    private static final long INITIAL_DELAY_SECONDS = 0;
+    private static final long INTERVAL_SECONDS = 86400;
 
     private ScheduledExecutorService executorService;
     private ScheduledFuture<?> scheduledTask;
@@ -123,7 +123,7 @@ public class DeploymentDataCollectorServiceComponent {
         name = "usage.data.publisher",
         service = Publisher.class,
         cardinality = ReferenceCardinality.MANDATORY,
-        policy = ReferencePolicy.DYNAMIC,
+        policy = ReferencePolicy.STATIC,
         unbind = "unsetPublisher",
         target = "(publisher.type=composite)"
     )
