@@ -60,18 +60,6 @@
         <checkstyle.version>10.12.5</checkstyle.version>
     </properties>
 
-    <dependencyManagement>
-        <dependencies>
-            <!-- OSGi Foundation -->
-            <dependency>
-                <groupId>org.apache.felix</groupId>
-                <artifactId>org.osgi.foundation</artifactId>
-                <version>${org.osgi.foundation.version}</version>
-                <scope>compile</scope>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
-
     <build>
         <pluginManagement>
             <plugins>
