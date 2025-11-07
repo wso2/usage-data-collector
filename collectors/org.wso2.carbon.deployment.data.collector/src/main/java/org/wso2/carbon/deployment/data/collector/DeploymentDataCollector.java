@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025, WSO2 LLC. (http://www.wso2.org) All Rights Reserved.
+ * Copyright (c) 2025, WSO2 LLC. (http://www.wso2.com) All Rights Reserved.
  *
  * WSO2 LLC. licenses this file to you under the Apache License,
  * Version 2.0 (the "License"); you may not use this file except
@@ -51,7 +51,9 @@ public class DeploymentDataCollector {
      */
     public void collectAndPublish() {
         try {
-            log.debug("Starting deployment data collection");
+            if(log.isDebugEnabled()) {
+                log.debug("Starting deployment data collection");
+            }
 
             DeploymentData data = new DeploymentData();
 
@@ -67,12 +69,16 @@ public class DeploymentDataCollector {
             // Collect hardware information
             collectHardwareInfo(data);
 
-            log.debug("Collected deployment data: " + data);
+            if(log.isDebugEnabled()) {
+                log.debug("Collected deployment data: " + data);
+            }
 
             // Publish the data
             publisher.publish(data);
 
-            log.info("Successfully collected and published deployment data");
+            if(log.isDebugEnabled()) {
+                log.debug("Successfully collected and published deployment data");
+            }
 
         } catch (Exception e) {
             log.error("Failed to collect and publish deployment data", e);
@@ -122,7 +128,9 @@ public class DeploymentDataCollector {
             if (productFile.exists() && productFile.canRead()) {
                 String productVersion = readFirstLineFromFile(productFile);
                 if (!productVersion.isEmpty()) {
-                    log.info("Product version from product.txt: " + productVersion);
+                    if(log.isDebugEnabled()) {
+                        log.debug("Product version from product.txt: " + productVersion);
+                    }
                     data.setProductVersion(productVersion);
                 } else {
                     data.setProductVersion(DEFAULT_PRODUCT_VERSION);
@@ -165,7 +173,7 @@ public class DeploymentDataCollector {
             String line = reader.readLine();
             return line != null ? line.trim() : "";
         } catch (Exception e) {
-            log.debug("Could not read file: " + file.getAbsolutePath(), e);
+            log.error("Could not read file: " + file.getAbsolutePath(), e);
             return "";
         }
     }

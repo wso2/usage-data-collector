@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025, WSO2 LLC. (http://www.wso2.org) All Rights Reserved.
+ * Copyright (c) 2025, WSO2 LLC. (http://www.wso2.com) All Rights Reserved.
  *
  * WSO2 LLC. licenses this file to you under the Apache License,
  * Version 2.0 (the "License"); you may not use this file except
@@ -65,7 +65,9 @@ public class CompositePublisher implements Publisher {
         if (failures.size() == publishers.size()) {
             throw new PublisherException("All publishers failed to publish data", failures.get(0));
         } else if (!failures.isEmpty()) {
-            log.warn(failures.size() + " out of " + publishers.size() + " publishers failed");
+            if(log.isDebugEnabled()) {
+                log.debug(failures.size() + " out of " + publishers.size() + " publishers failed");
+            }
         }
     }
 

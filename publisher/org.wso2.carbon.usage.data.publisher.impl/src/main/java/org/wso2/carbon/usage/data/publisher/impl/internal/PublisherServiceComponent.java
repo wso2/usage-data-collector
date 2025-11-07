@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025, WSO2 LLC. (http://www.wso2.org) All Rights Reserved.
+ * Copyright (c) 2025, WSO2 LLC. (http://www.wso2.com) All Rights Reserved.
  *
  * WSO2 LLC. licenses this file to you under the Apache License,
  * Version 2.0 (the "License"); you may not use this file except
@@ -65,13 +65,17 @@ public class PublisherServiceComponent {
     protected void setPublisher(Publisher publisher) {
         // Prevent circular dependency - don't track CompositePublisher
         if (publisher instanceof CompositePublisher) {
-            log.debug("Ignoring CompositePublisher to prevent circular dependency");
+            if(log.isDebugEnabled()) {
+                log.debug("Ignoring CompositePublisher to prevent circular dependency");
+            }
             return;
         }
 
         publishers.add(publisher);
-        log.info("Publisher registered: " + publisher.getClass().getName() +
-                 " (Total publishers: " + publishers.size() + ")");
+        if(log.isDebugEnabled()) {
+            log.debug("Publisher registered: " + publisher.getClass().getName() +
+                    " (Total publishers: " + publishers.size() + ")");
+        }
     }
 
     /**
@@ -84,8 +88,10 @@ public class PublisherServiceComponent {
         }
 
         publishers.remove(publisher);
-        log.info("Publisher unregistered: " + publisher.getClass().getName() +
-                 " (Total publishers: " + publishers.size() + ")");
+        if(log.isDebugEnabled()) {
+            log.debug("Publisher unregistered: " + publisher.getClass().getName() +
+                    " (Total publishers: " + publishers.size() + ")");
+        }
     }
 
     @Activate
@@ -107,8 +113,10 @@ public class PublisherServiceComponent {
                 properties
             );
 
-            log.info("Usage Data Publisher Service activated successfully with " +
-                     publishers.size() + " publisher(s)");
+            if(log.isDebugEnabled()) {
+                log.debug("Usage Data Publisher Service activated successfully with " +
+                        publishers.size() + " publisher(s)");
+            }
         } catch (Exception e) {
             log.error("Failed to activate Usage Data Publisher Service", e);
         }
@@ -129,7 +137,9 @@ public class PublisherServiceComponent {
         }
 
         publishers.clear();
-        log.info("Usage Data Publisher Service deactivated successfully");
+        if(log.isDebugEnabled()) {
+            log.debug("Usage Data Publisher Service deactivated successfully");
+        }
     }
 }
 

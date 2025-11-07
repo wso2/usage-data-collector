@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025, WSO2 LLC. (http://www.wso2.org) All Rights Reserved.
+ * Copyright (c) 2025, WSO2 LLC. (http://www.wso2.com) All Rights Reserved.
  *
  * WSO2 LLC. licenses this file to you under the Apache License,
  * Version 2.0 (the "License"); you may not use this file except
@@ -81,7 +81,9 @@ public class HttpPublisher implements Publisher {
                 .setDefaultRequestConfig(requestConfig)
                 .build();
 
-        log.info("HTTP Publisher initialized with receiver URL: " + RECEIVER_URL);
+        if(log.isDebugEnabled()) {
+            log.debug("HTTP Publisher initialized with receiver URL: " + RECEIVER_URL);
+        }
     }
 
     @Override
@@ -91,7 +93,9 @@ public class HttpPublisher implements Publisher {
         }
 
         String jsonPayload = data.toJson();
-        log.debug("Publishing usage data: " + jsonPayload);
+        if(log.isDebugEnabled()) {
+            log.debug("Publishing usage data: " + jsonPayload);
+        }
 
         int attempt = 0;
         Exception lastException = null;
@@ -100,12 +104,16 @@ public class HttpPublisher implements Publisher {
             attempt++;
             try {
                 sendHttpPost(jsonPayload);
-                log.info("Successfully published usage data (attempt " + attempt + ")");
+                if(log.isDebugEnabled()) {
+                    log.debug("Successfully published usage data (attempt " + attempt + ")");
+                }
                 return;
             } catch (IOException e) {
                 lastException = e;
-                log.warn("Failed to publish usage data (attempt " + attempt + "/" + RETRY_COUNT + "): "
-                        + e.getMessage());
+                if(log.isDebugEnabled()) {
+                    log.debug("Failed to publish usage data (attempt " + attempt + "/" + RETRY_COUNT + "): "
+                            + e.getMessage());
+                }
 
                 if (attempt < RETRY_COUNT) {
                     try {
@@ -140,7 +148,9 @@ public class HttpPublisher implements Publisher {
         if (httpClient != null) {
             try {
                 httpClient.close();
-                log.info("HTTP Publisher shutdown successfully");
+                if(log.isDebugEnabled()) {
+                    log.debug("HTTP Publisher shutdown successfully");
+                }
             } catch (IOException e) {
                 log.error("Error shutting down HTTP Publisher", e);
             }

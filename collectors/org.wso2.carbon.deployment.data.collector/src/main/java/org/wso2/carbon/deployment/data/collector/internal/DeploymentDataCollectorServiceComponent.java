@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025, WSO2 LLC. (http://www.wso2.org) All Rights Reserved.
+ * Copyright (c) 2025, WSO2 LLC. (http://www.wso2.com) All Rights Reserved.
  *
  * WSO2 LLC. licenses this file to you under the Apache License,
  * Version 2.0 (the "License"); you may not use this file except
@@ -88,8 +88,10 @@ public class DeploymentDataCollectorServiceComponent {
                 TimeUnit.SECONDS
             );
 
-            log.info("Deployment Data Collector scheduled successfully - Initial delay: "
-                    + INITIAL_DELAY_SECONDS + "s, Interval: " + INTERVAL_SECONDS + "s");
+            if(log.isDebugEnabled()) {
+                log.debug("Deployment Data Collector scheduled successfully - Initial delay: "
+                        + INITIAL_DELAY_SECONDS + "s, Interval: " + INTERVAL_SECONDS + "s");
+            }
 
         } catch (Exception e) {
             log.error("Failed to activate Deployment Data Collector Service", e);
@@ -116,7 +118,9 @@ public class DeploymentDataCollectorServiceComponent {
             }
         }
 
-        log.info("Deployment Data Collector Service deactivated successfully");
+        if(log.isDebugEnabled()) {
+            log.debug("Deployment Data Collector Service deactivated successfully");
+        }
     }
 
     @Reference(
@@ -128,12 +132,16 @@ public class DeploymentDataCollectorServiceComponent {
         target = "(publisher.type=composite)"
     )
     protected void setPublisher(Publisher publisher) {
-        log.info("Setting CompositePublisher service");
+        if(log.isDebugEnabled()) {
+            log.debug("Setting CompositePublisher service");
+        }
         this.publisher = publisher;
     }
 
     protected void unsetPublisher(Publisher publisher) {
-        log.debug("Unsetting Publisher service");
+        if(log.isDebugEnabled()) {
+            log.debug("Unsetting Publisher service");
+        }
         this.publisher = null;
     }
 }
