@@ -40,6 +40,7 @@ public class DeploymentData extends UsageData {
     public DeploymentData() {
         super();
         this.timestamp = Instant.now().toString();
+        this.dataType = "DEPLOYMENT_DATA";
     }
 
     @Override
@@ -117,6 +118,7 @@ public class DeploymentData extends UsageData {
     public String toString() {
         return "DeploymentData{" +
                 "timestamp='" + timestamp + '\'' +
+                ", dataType='" + dataType + '\'' +
                 ", operatingSystem='" + operatingSystem + '\'' +
                 ", operatingSystemVersion='" + operatingSystemVersion + '\'' +
                 ", operatingSystemArchitecture='" + operatingSystemArchitecture + '\'' +
