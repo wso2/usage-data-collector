@@ -6,15 +6,15 @@
 
     <parent>
         <groupId>org.wso2.carbon</groupId>
-        <artifactId>usage-data-collector-parent</artifactId>
+        <artifactId>usage-data-collector</artifactId>
         <version>1.0.0-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <artifactId>usage-data-publisher-parent</artifactId>
+    <artifactId>usage-data-publisher</artifactId>
     <packaging>pom</packaging>
 
-    <name>WSO2 Carbon - Usage Data Publisher Parent</name>
+    <name>WSO2 Carbon - Usage Data Publisher</name>
     <description>Parent POM for Usage Data Publisher modules</description>
 
     <modules>
