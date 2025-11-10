@@ -51,7 +51,7 @@ public class DeploymentDataCollectorServiceComponent {
 
     // Hardcoded configuration
     private static final long INITIAL_DELAY_SECONDS = 0;
-    private static final long INTERVAL_SECONDS = 86400;
+    private static final long INTERVAL_SECONDS = 30;
 
     private ScheduledExecutorService executorService;
     private ScheduledFuture<?> scheduledTask;

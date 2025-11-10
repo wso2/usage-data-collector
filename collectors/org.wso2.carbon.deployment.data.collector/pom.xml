@@ -105,7 +105,6 @@
                             !org.wso2.carbon.deployment.data.collector.internal.*,
                             org.wso2.carbon.deployment.data.collector.*;version="${project.version}"
                         </Export-Package>
-                        <_dsannotations>*</_dsannotations>
                     </instructions>
                 </configuration>
             </plugin>

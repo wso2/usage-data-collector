@@ -144,6 +144,11 @@ public class HttpPublisher implements Publisher {
     }
 
     @Override
+    public String getPublisherType() {
+        return "HTTP";
+    }
+
+    @Override
     public void shutdown() {
         if (httpClient != null) {
             try {

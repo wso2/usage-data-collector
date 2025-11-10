@@ -23,62 +23,72 @@ import org.apache.commons.logging.LogFactory;
 import org.wso2.carbon.usage.data.publisher.api.Publisher;
 import org.wso2.carbon.usage.data.publisher.api.PublisherException;
 import org.wso2.carbon.usage.data.publisher.api.model.UsageData;
+import org.wso2.carbon.usage.data.publisher.impl.internal.PublisherDataHolder;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Composite publisher that delegates to multiple publisher implementations.
- * Ensures that data is published to all registered publishers.
+ * Publishes data asynchronously to all registered publishers in a fire-and-forget manner.
  */
 public class CompositePublisher implements Publisher {
 
     private static final Log log = LogFactory.getLog(CompositePublisher.class);
-    private final List<Publisher> publishers;
 
-    public CompositePublisher(List<Publisher> publishers) {
-        this.publishers = publishers;
+    public CompositePublisher() {
+        // Publishers are managed by PublisherDataHolder
     }
 
     @Override
     public void publish(UsageData data) throws PublisherException {
+        List<Publisher> publishers = PublisherDataHolder.getInstance().getPublishers();
+
         if (publishers.isEmpty()) {
             log.warn("No publishers available to publish data");
             return;
         }
 
-        List<PublisherException> failures = new ArrayList<>();
-
-        for (Publisher publisher : publishers) {
-            try {
-                if (log.isDebugEnabled()) {
-                    log.debug("Publishing data using: " + publisher.getClass().getName());
+        // Fire-and-forget: publish asynchronously to all publishers without blocking
+        publishers.forEach(publisher ->
+            CompletableFuture.runAsync(() -> {
+                try {
+                    if (log.isDebugEnabled()) {
+                        log.debug("Publishing data using " + publisher.getPublisherType() + " publisher");
+                    }
+                    publisher.publish(data);
+                    if (log.isDebugEnabled()) {
+                        log.debug("Successfully published data using " + publisher.getPublisherType() + " publisher");
+                    }
+                } catch (PublisherException e) {
+                    log.error("Publisher failed: " + publisher.getPublisherType(), e);
                 }
-                publisher.publish(data);
-            } catch (PublisherException e) {
-                log.error("Publisher failed: " + publisher.getClass().getName(), e);
-                failures.add(e);
-            }
-        }
+            })
+        );
 
-        // Throw exception if all publishers failed
-        if (failures.size() == publishers.size()) {
-            throw new PublisherException("All publishers failed to publish data", failures.get(0));
-        } else if (!failures.isEmpty()) {
-            if(log.isDebugEnabled()) {
-                log.debug(failures.size() + " out of " + publishers.size() + " publishers failed");
-            }
+        if (log.isDebugEnabled()) {
+            log.debug("Initiated asynchronous publishing to " + publishers.size() + " publisher(s)");
         }
     }
 
     @Override
+    public String getPublisherType() {
+        return "COMPOSITE";
+    }
+
+    @Override
     public void shutdown() {
-        log.info("Shutting down composite publisher with " + publishers.size() + " publisher(s)");
+        List<Publisher> publishers = PublisherDataHolder.getInstance().getPublishers();
+
+        if (log.isDebugEnabled()) {
+            log.debug("Shutting down composite publisher with " + publishers.size() + " publisher(s)");
+        }
+
         for (Publisher publisher : publishers) {
             try {
                 publisher.shutdown();
             } catch (Exception e) {
-                log.error("Failed to shutdown publisher: " + publisher.getClass().getName(), e);
+                log.error("Failed to shutdown publisher: " + publisher.getPublisherType(), e);
             }
         }
     }

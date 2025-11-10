@@ -32,9 +32,6 @@ import org.osgi.service.component.annotations.ReferencePolicy;
 import org.wso2.carbon.usage.data.publisher.api.Publisher;
 import org.wso2.carbon.usage.data.publisher.impl.CompositePublisher;
 
-import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
-
 /**
  * OSGi service component that tracks all Publisher implementations.
  * Registers a CompositePublisher that delegates to all available publishers.
@@ -46,7 +43,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class PublisherServiceComponent {
 
     private static final Log log = LogFactory.getLog(PublisherServiceComponent.class);
-    private final List<Publisher> publishers = new CopyOnWriteArrayList<>();
     private ServiceRegistration<Publisher> serviceRegistration;
     private CompositePublisher compositePublisher;
 
@@ -71,10 +67,10 @@ public class PublisherServiceComponent {
             return;
         }
 
-        publishers.add(publisher);
+        PublisherDataHolder.getInstance().addPublisher(publisher);
         if(log.isDebugEnabled()) {
-            log.debug("Publisher registered: " + publisher.getClass().getName() +
-                    " (Total publishers: " + publishers.size() + ")");
+            log.debug("Publisher registered: " + publisher.getPublisherType() +
+                    " (Total publishers: " + PublisherDataHolder.getInstance().getPublishers().size() + ")");
         }
     }
 
@@ -87,10 +83,10 @@ public class PublisherServiceComponent {
             return;
         }
 
-        publishers.remove(publisher);
+        PublisherDataHolder.getInstance().removePublisher(publisher);
         if(log.isDebugEnabled()) {
-            log.debug("Publisher unregistered: " + publisher.getClass().getName() +
-                    " (Total publishers: " + publishers.size() + ")");
+            log.debug("Publisher unregistered: " + publisher.getPublisherType() +
+                    " (Total publishers: " + PublisherDataHolder.getInstance().getPublishers().size() + ")");
         }
     }
 
@@ -99,8 +95,8 @@ public class PublisherServiceComponent {
         try {
             log.info("Activating Usage Data Publisher Service");
 
-            // Create composite publisher that delegates to all registered publishers
-            compositePublisher = new CompositePublisher(publishers);
+            // Create composite publisher (uses PublisherDataHolder internally)
+            compositePublisher = new CompositePublisher();
 
             // Register the composite publisher as an OSGi service with marker property
             BundleContext bundleContext = context.getBundleContext();
@@ -113,9 +109,9 @@ public class PublisherServiceComponent {
                 properties
             );
 
-            if(log.isDebugEnabled()) {
+            if (log.isDebugEnabled()) {
                 log.debug("Usage Data Publisher Service activated successfully with " +
-                        publishers.size() + " publisher(s)");
+                        PublisherDataHolder.getInstance().getPublishers().size() + " publisher(s)");
             }
         } catch (Exception e) {
             log.error("Failed to activate Usage Data Publisher Service", e);
@@ -136,8 +132,10 @@ public class PublisherServiceComponent {
             compositePublisher.shutdown();
         }
 
-        publishers.clear();
-        if(log.isDebugEnabled()) {
+        // Clear the data holder
+        PublisherDataHolder.getInstance().clearPublishers();
+
+        if (log.isDebugEnabled()) {
             log.debug("Usage Data Publisher Service deactivated successfully");
         }
     }

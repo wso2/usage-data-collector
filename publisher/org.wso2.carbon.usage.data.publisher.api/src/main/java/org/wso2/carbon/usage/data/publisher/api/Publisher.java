@@ -34,6 +34,13 @@ public interface Publisher {
     void publish(UsageData data) throws PublisherException;
 
     /**
+     * Gets the type of this publisher (e.g., "HTTP", "KAFKA", "COMPOSITE").
+     *
+     * @return The publisher type as a string
+     */
+    String getPublisherType();
+
+    /**
      * Shuts down the publisher and releases resources.
      */
     void shutdown();
