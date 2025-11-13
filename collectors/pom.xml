@@ -35,10 +35,25 @@
     <description>Parent POM for Usage Data Collector modules</description>
 
     <modules>
-        <module>org.wso2.carbon.apimgt.usage.data.collector</module>
-        <module>org.wso2.carbon.identity.usage.data.collector</module>
-        <module>org.wso2.carbon.mi.usage.data.collector</module>
-        <module>org.wso2.carbon.deployment.data.collector</module>
+        <module>org.wso2.carbon.usage.data.collector.apim</module>
+        <module>org.wso2.carbon.usage.data.collector.identity</module>
+        <module>org.wso2.carbon.usage.data.collector.mi</module>
+        <module>org.wso2.carbon.usage.data.collector.common</module>
     </modules>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <basedir/>
+                    <outputDirectory/>
+                    <projectArtifact/>
+                    <source>8</source>
+                    <target>8</target>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>
 
