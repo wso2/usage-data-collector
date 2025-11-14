@@ -75,6 +75,14 @@ public class HttpPublisher {
             return;
         }
 
+        // Normalize maxRetries to ensure at least one attempt
+        if (maxRetries <= 0) {
+            maxRetries = 1;
+            if (log.isDebugEnabled()) {
+                log.debug("Invalid maxRetries value provided, normalized to 1");
+            }
+        }
+
         if (log.isDebugEnabled()) {
             log.debug("Publishing usage data via Publisher with max retries: " + maxRetries);
         }
@@ -87,7 +95,6 @@ public class HttpPublisher {
 
         // Execute with retry logic
         int attempt = 0;
-        Exception lastException = null;
 
         while (attempt < maxRetries) {
             attempt++;
