@@ -36,7 +36,6 @@
     <description>Parent POM for Usage Data Collector modules</description>
 
     <modules>
-        <module>publisher</module>
         <module>collectors</module>
     </modules>
 
@@ -48,6 +47,9 @@
         <apache.felix.version>1.0.0</apache.felix.version>
         <maven.bundle.plugin.version>3.3.0</maven.bundle.plugin.version>
         <org.osgi.foundation.version>1.0.0</org.osgi.foundation.version>
+
+        <!-- Commons Logging Version -->
+        <commons.logging.version.range>[1.2,2.0)</commons.logging.version.range>
 
         <!-- OSGi Import Package Versions -->
         <imp.package.version.osgi.service>[1.2.0,1.3.0)</imp.package.version.osgi.service>
@@ -61,6 +63,14 @@
     </properties>
 
     <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.felix</groupId>
+                <artifactId>maven-bundle-plugin</artifactId>
+                <version>${maven.bundle.plugin.version}</version>
+                <extensions>true</extensions>
+            </plugin>
+        </plugins>
         <pluginManagement>
             <plugins>
                 <plugin>
