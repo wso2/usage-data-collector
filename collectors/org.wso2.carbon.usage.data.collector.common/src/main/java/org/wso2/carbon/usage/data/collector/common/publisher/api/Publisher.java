@@ -52,25 +52,25 @@ public interface Publisher {
     DataSource getDataSource() throws PublisherException;
 
     /**
-     * Performs an internal API call using product-specific configuration.
-     * Internal calls are made to APIs within the same network/cluster.
-     * Each product may have different internal endpoints, authentication, and SSL requirements.
+     * Performs a receiver API call using product-specific configuration.
+     * Receiver calls are made to the configured receiver endpoint to publish usage data.
+     * Each product may have different receiver endpoints, authentication, and SSL requirements.
      *
      * @param request The API request containing data and parameters
      * @return ApiResponse containing status, body, and metadata
      * @throws PublisherException If the API call fails after all retries
      */
-    ApiResponse callInternalApi(ApiRequest request) throws PublisherException;
+    ApiResponse callReceiverApi(ApiRequest request) throws PublisherException;
 
     /**
-     * Performs an external API call using product-specific configuration.
-     * External calls are made to APIs outside the local network/cluster.
-     * Each product may have different external endpoints, authentication, and SSL requirements.
+     * Performs a WSO2 API call using product-specific configuration.
+     * WSO2 calls are made to WSO2 analytics or telemetry services.
+     * Each product may have different WSO2 endpoints, authentication, and SSL requirements.
      *
      * @param request The API request containing data and parameters (including endpoint)
      * @return ApiResponse containing status, body, and metadata
      * @throws PublisherException If the API call fails after all retries
      */
-    ApiResponse callExternalApi(ApiRequest request) throws PublisherException;
+    ApiResponse callWso2Api(ApiRequest request) throws PublisherException;
 }
 
