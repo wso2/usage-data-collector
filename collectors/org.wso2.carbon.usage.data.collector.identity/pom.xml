@@ -28,11 +28,11 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <artifactId>org.wso2.carbon.usage.data.collector.mi</artifactId>
+    <artifactId>org.wso2.carbon.usage.data.collector.identity</artifactId>
     <packaging>bundle</packaging>
 
-    <name>WSO2 Carbon - Micro Integrator Usage Data Collector</name>
-    <description>Usage Data Collector for Micro Integrator with scheduler and utility code</description>
+    <name>WSO2 Carbon - Identity Server Usage Data Collector</name>
+    <description>Usage Data Collector for Identity Server with scheduler and utility code</description>
 
     <dependencies>
         <!-- Common Publisher API -->
@@ -77,4 +77,5 @@
         </dependency>
     </dependencies>
 </project>
+
 
