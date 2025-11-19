@@ -16,25 +16,31 @@
  * under the License.
  */
 
-package org.wso2.carbon.usage.data.collector.mi;
+package org.wso2.carbon.usage.data.collector.mi.transaction.counter;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.synapse.MessageContext;
 import org.apache.synapse.core.axis2.Axis2MessageContext;
 
 public class TransactionCountingLogic {
 
+    private static final Log LOG = LogFactory.getLog(TransactionCountingLogic.class);
+
     public static int handleRequestInFlow(MessageContext messageContext) {
-        org.apache.axis2.context.MessageContext axis2MessageContext =
-                ((Axis2MessageContext) messageContext).getAxis2MessageContext();
+        if (messageContext != null) {
+            org.apache.axis2.context.MessageContext axis2MessageContext =
+                    ((Axis2MessageContext) messageContext).getAxis2MessageContext();
 
-        // Setting this property to identify request-response pairs
-        messageContext.setProperty(TransactionCounterConstants.IS_THERE_ASSOCIATED_INCOMING_REQUEST, true);
+            // Setting this property to identify request-response pairs
+            messageContext.setProperty(TransactionCounterConstants.IS_THERE_ASSOCIATED_INCOMING_REQUEST, true);
 
-        // Counting message received via an open WebSocket
-        String transport = axis2MessageContext.getIncomingTransportName();
-        if (transport.equals(TransactionCounterConstants.TRANSPORT_WS) ||
-                transport.equals(TransactionCounterConstants.TRANSPORT_WSS)){
-            return 1;
+            // Counting message received via an open WebSocket
+            String transport = axis2MessageContext.getIncomingTransportName();
+            if (transport.equals(TransactionCounterConstants.TRANSPORT_WS) ||
+                    transport.equals(TransactionCounterConstants.TRANSPORT_WSS)){
+                return 1;
+            }
         }
         return 0;
     }

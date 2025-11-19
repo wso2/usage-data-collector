@@ -16,7 +16,7 @@
  * under the License.
  */
 
-package org.wso2.carbon.usage.data.collector.mi;
+package org.wso2.carbon.usage.data.collector.mi.transaction.counter;
 
 public class TransactionCounterConstants {
 
@@ -39,7 +39,4 @@ public class TransactionCounterConstants {
     public static final String MI_CONFIG_CLASS = "org.wso2.config.mapper.ConfigParser";
     public static final String MI_CONFIG_ROOT = "integration.transaction_counter";
     public static final String MI_SERVER_ID = MI_CONFIG_ROOT + ".server_id";
-
-    // Default values
-    public static final String DEFAULT_SERVER_ID = "default";
 }

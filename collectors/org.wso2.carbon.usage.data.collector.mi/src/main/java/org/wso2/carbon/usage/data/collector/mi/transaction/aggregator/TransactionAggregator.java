@@ -16,12 +16,12 @@
  * under the License.
  */
 
-package org.wso2.carbon.usage.data.collector.mi.aggregator;
+package org.wso2.carbon.usage.data.collector.mi.transaction.aggregator;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.wso2.carbon.usage.data.collector.mi.publisher.TransactionReportPublisher;
-import org.wso2.carbon.usage.data.collector.mi.record.TransactionReport;
+import org.wso2.carbon.usage.data.collector.mi.transaction.publisher.TransactionPublisher;
+import org.wso2.carbon.usage.data.collector.mi.transaction.record.TransactionReport;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -34,7 +34,7 @@ public class TransactionAggregator {
     private static TransactionAggregator instance = null;
     
     private final AtomicLong hourlyTransactionCount = new AtomicLong(0);
-    private TransactionReportPublisher publisher;
+    private TransactionPublisher publisher;
     private ScheduledExecutorService scheduledExecutorService;
     private long currentHourStartTime;
     private boolean enabled = false;
@@ -48,14 +48,9 @@ public class TransactionAggregator {
         return instance;
     }
 
-    /**
-     * Initialize the hourly aggregator with the publisher implementation.
-     * 
-     * @param publisher The publisher implementation to use for hourly publishing
-     */
-    public void init(TransactionReportPublisher publisher) {
+    public void init(TransactionPublisher publisher) {
         if (publisher == null) {
-            LOG.warn("TransactionReportPublisher is null. Hourly aggregation will be disabled.");
+            LOG.warn("TransactionPublisher is null. Hourly aggregation will be disabled.");
             return;
         }
 
@@ -63,11 +58,9 @@ public class TransactionAggregator {
         this.currentHourStartTime = System.currentTimeMillis();
         this.scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
 
-        // *** TEST MODE: Publishing every 30 seconds for testing ***
-        long publishInterval = 30000L; // 30 seconds in milliseconds
-        long initialDelay = 30000L; // Start after 30 seconds
+        long publishInterval = 30000L;
+        long initialDelay = 30000L;
 
-        // Schedule to run every 30 seconds
         scheduledExecutorService.scheduleAtFixedRate(
             this::publishAndReset,
             initialDelay,
@@ -78,12 +71,6 @@ public class TransactionAggregator {
         this.enabled = true;
     }
 
-    /**
-     * Add transactions to the hourly count. This method is thread-safe and lock-free,
-     * capable of handling millions of calls per second.
-     * 
-     * @param count The number of transactions to add
-     */
     public void addTransactions(int count) {
         if (!enabled || count <= 0) {
             return;
@@ -91,61 +78,37 @@ public class TransactionAggregator {
         hourlyTransactionCount.addAndGet(count);
     }
 
-    /**
-     * Publishes the hourly transaction count and resets the counter.
-     * Called automatically once per hour by the scheduled executor.
-     */
     private void publishAndReset() {
         try {
-            // Atomically get the current count and reset to 0
             long count = hourlyTransactionCount.getAndSet(0);
             long hourEndTime = System.currentTimeMillis();
             
-            if (count > 0) {
-                TransactionReport summary = new TransactionReport(
-                    count, 
-                    currentHourStartTime, 
-                    hourEndTime
-                );
-                
-                publisher.publishTransaction(summary);
-            }
+            // Always send transaction report, even when count is zero
+            TransactionReport summary = new TransactionReport(
+                count, 
+                currentHourStartTime, 
+                hourEndTime
+            );
             
-            // Update the start time for the next hour
+            publisher.publishTransaction(summary);
+            
             currentHourStartTime = hourEndTime;
             
         } catch (Exception e) {
-            LOG.error("Error while publishing hourly transaction count", e);
-            // Don't reset the counter if publishing failed - we'll try again next hour
-            // Note: This means the next hour will include this hour's count
+            LOG.error("TransactionAggregator: Error while publishing hourly transaction count", e);
         }
     }
 
-    /**
-     * Get the current hourly transaction count without resetting it.
-     * Useful for monitoring or debugging.
-     * 
-     * @return The current transaction count for this hour
-     */
     public long getCurrentHourlyCount() {
         return hourlyTransactionCount.get();
     }
 
-    /**
-     * Check if the hourly aggregator is enabled and running.
-     * 
-     * @return true if enabled, false otherwise
-     */
     public boolean isEnabled() {
         return enabled;
     }
 
-    /**
-     * Shutdown the hourly aggregator and publish any remaining counts.
-     */
     public void shutdown() {
         if (scheduledExecutorService != null) {
-            // Publish remaining counts before shutdown
             publishAndReset();
             
             scheduledExecutorService.shutdownNow();

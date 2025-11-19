@@ -42,23 +42,6 @@
             <version>${project.version}</version>
         </dependency>
 
-        <!-- Note: Synapse and Axis2 dependencies will be provided by MI runtime environment
-             For compilation, we'll create stub classes -->
-        <!--
-        <dependency>
-            <groupId>org.apache.synapse</groupId>
-            <artifactId>synapse-core</artifactId>
-            <version>4.0.0</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.axis2</groupId>
-            <artifactId>axis2-kernel</artifactId>
-            <version>1.6.2</version>
-            <scope>provided</scope>
-        </dependency>
-        -->
-
         <!-- Apache HTTP Client -->
         <dependency>
             <groupId>org.apache.httpcomponents</groupId>
@@ -110,6 +93,8 @@
                         </Private-Package>
                         <Import-Package>
                             org.apache.commons.logging.*,
+                            org.apache.synapse.*,
+                            org.apache.axis2.context.*,
                             org.wso2.carbon.usage.data.collector.common.publisher.api.*;version="${project.version}",
                             org.osgi.service.*;version="${imp.package.version.osgi.service}",
                             javax.sql,
@@ -118,10 +103,12 @@
                         <Export-Package>
                             !org.wso2.carbon.usage.data.collector.mi.internal.*,
                             org.wso2.carbon.usage.data.collector.mi;version="${project.version}",
-                            org.wso2.carbon.usage.data.collector.mi.api.*;version="${project.version}",
                             org.wso2.carbon.usage.data.collector.mi.publisher.*;version="${project.version}",
-                            org.wso2.carbon.usage.data.collector.mi.aggregator.*;version="${project.version}",
-                            org.wso2.carbon.usage.data.collector.mi.record.*;version="${project.version}"
+                            org.wso2.carbon.usage.data.collector.mi.transaction.record.*;version="${project.version}",
+                            org.wso2.carbon.usage.data.collector.mi.transaction.counter.*;version="${project.version}",
+                            org.wso2.carbon.usage.data.collector.mi.transaction.aggregator.*;version="${project.version}",
+                            org.wso2.carbon.usage.data.collector.mi.transaction.publisher.*;version="${project.version}",
+                            org.wso2.carbon.usage.data.collector.mi.datasource.*;version="${project.version}"
                         </Export-Package>
                     </instructions>
                 </configuration>
@@ -132,6 +119,8 @@
                 <configuration>
                     <source>8</source>
                     <target>8</target>
+                    <!-- Skip compilation by default for OSGi bundle - classes will be available at WSO2 MI runtime -->
+                    <skipMain>${skip.compilation}</skipMain>
                 </configuration>
             </plugin>
         </plugins>

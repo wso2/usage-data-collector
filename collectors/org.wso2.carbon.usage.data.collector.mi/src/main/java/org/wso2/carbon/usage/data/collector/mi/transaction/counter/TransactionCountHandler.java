@@ -16,40 +16,58 @@
  * under the License.
  */
 
-package org.wso2.carbon.usage.data.collector.mi;
+package org.wso2.carbon.usage.data.collector.mi.transaction.counter;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.synapse.AbstractExtendedSynapseHandler;
 import org.apache.synapse.MessageContext;
-import org.wso2.carbon.usage.data.collector.mi.aggregator.TransactionAggregator;
-import org.wso2.carbon.usage.data.collector.mi.publisher.TransactionReportPublisher;
-import org.wso2.carbon.usage.data.collector.mi.record.TransactionReport;
+import org.wso2.carbon.usage.data.collector.mi.transaction.aggregator.TransactionAggregator;
+import org.wso2.carbon.usage.data.collector.mi.transaction.publisher.TransactionPublisher;
 
 public class TransactionCountHandler extends AbstractExtendedSynapseHandler {
     private static final Log LOG = LogFactory.getLog(TransactionCountHandler.class);
     private TransactionAggregator transactionAggregator;
-    private TransactionReportPublisher publisher;
+    private TransactionPublisher publisher;
     private static boolean enabled = false;
+    private static TransactionCountHandler instance;
+    
+    public static void registerTransactionPublisher(TransactionPublisher reporter) {
+        if (instance == null || instance.transactionAggregator == null) {
+            if (instance == null) {
+                instance = new TransactionCountHandler();
+            }
+            
+            instance.publisher = reporter;
+            instance.transactionAggregator = TransactionAggregator.getInstance();
+            instance.transactionAggregator.init(reporter);
+            enabled = true;
+        } else {
+            instance.publisher = reporter;
+        }
+    }
+    
+    public static void unregisterTransactionPublisher(TransactionPublisher reporter) {
+        if (instance != null && instance.publisher == reporter) {
+            instance.publisher = null;
+        }
+    }
 
     public TransactionCountHandler() {
         try {
-            LOG.debug("Initializing Usage Data Collector");
-            
-            // Create publisher that directly calls the HTTP publisher
-            this.publisher = new TransactionReportPublisher();
-            
-            // Initialize aggregator
-            this.transactionAggregator = TransactionAggregator.getInstance();
-            this.transactionAggregator.init(this.publisher);
-            
-            enabled = true;
-            LOG.debug("Transaction Counter initialized successfully - will send data to analytics endpoint");
-            
+            if (instance == null || instance.transactionAggregator == null) {
+                instance = this;
+            }
         } catch (Exception e) {
-            LOG.error("Error while initializing Transaction Counter. Transaction counter will be disabled", e);
+            LOG.error("TransactionCountHandler: Error in constructor", e);
             enabled = false;
         }
+    }
+
+    @Override
+    public boolean handleServerInit() {
+        // Nothing to implement
+        return true;
     }
 
     @Override
@@ -59,11 +77,23 @@ public class TransactionCountHandler extends AbstractExtendedSynapseHandler {
         }
         int tCount = TransactionCountingLogic.handleRequestInFlow(messageContext);
         if(tCount > 0) {
-            LOG.info("New transaction detected in RequestInFlow - Count: " + tCount);
-            if(this.transactionAggregator != null && this.transactionAggregator.isEnabled()) {
-                this.transactionAggregator.addTransactions(tCount);
+            if(instance != null && instance.transactionAggregator != null && instance.transactionAggregator.isEnabled()) {
+                instance.transactionAggregator.addTransactions(tCount);
             }
         }
+        return true;
+    }
+
+    @Override
+    public boolean handleServerShutDown() {
+        LOG.debug("Shutting down Transaction Counter...");
+        
+        // Clean up resources
+        if (transactionAggregator != null && transactionAggregator.isEnabled()) {
+            transactionAggregator.shutdown();
+        }
+        
+        LOG.debug("Transaction Counter shutdown completed");
         return true;
     }
 
@@ -74,9 +104,8 @@ public class TransactionCountHandler extends AbstractExtendedSynapseHandler {
         }
         int tCount = TransactionCountingLogic.handleRequestOutFlow(messageContext);
         if(tCount > 0) {
-            LOG.info("New transaction detected in RequestOutFlow - Count: " + tCount);
-            if(this.transactionAggregator != null && this.transactionAggregator.isEnabled()) {
-                this.transactionAggregator.addTransactions(tCount);
+            if(instance != null && instance.transactionAggregator != null && instance.transactionAggregator.isEnabled()) {
+                instance.transactionAggregator.addTransactions(tCount);
             }
         }
         return true;
@@ -89,9 +118,8 @@ public class TransactionCountHandler extends AbstractExtendedSynapseHandler {
         }
         int tCount = TransactionCountingLogic.handleResponseInFlow(messageContext);
         if(tCount > 0) {
-            LOG.info("New transaction detected in ResponseInFlow - Count: " + tCount);
-            if(this.transactionAggregator != null && this.transactionAggregator.isEnabled()) {
-                this.transactionAggregator.addTransactions(tCount);
+            if(instance != null && instance.transactionAggregator != null && instance.transactionAggregator.isEnabled()) {
+                instance.transactionAggregator.addTransactions(tCount);
             }
         }
         return true;
@@ -104,35 +132,14 @@ public class TransactionCountHandler extends AbstractExtendedSynapseHandler {
         }
         int tCount = TransactionCountingLogic.handleResponseOutFlow(messageContext);
         if(tCount > 0) {
-            LOG.info("New transaction detected in ResponseOutFlow - Count: " + tCount);
-            if(this.transactionAggregator != null && this.transactionAggregator.isEnabled()) {
-                this.transactionAggregator.addTransactions(tCount);
+            if(instance != null && instance.transactionAggregator != null && instance.transactionAggregator.isEnabled()) {
+                instance.transactionAggregator.addTransactions(tCount);
             }
         }
         return true;
     }
 
-    @Override
-    public boolean handleServerInit() {
-        // Nothing to implement
-        return true;
-    }
 
-    @Override
-    public boolean handleServerShutDown() {
-        LOG.debug("Shutting down Transaction Counter...");
-        
-        // Clean up resources
-        if (transactionAggregator != null && transactionAggregator.isEnabled()) {
-            transactionAggregator.shutdown();
-        }
-        if (publisher != null) {
-            publisher.shutdown();
-        }
-        
-        LOG.debug("Transaction Counter shutdown completed");
-        return true;
-    }
 
     @Override
     public boolean handleArtifactDeployment(String s, String s1, String s2) {
