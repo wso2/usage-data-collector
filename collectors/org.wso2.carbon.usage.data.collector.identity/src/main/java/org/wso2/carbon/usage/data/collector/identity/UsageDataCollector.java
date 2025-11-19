@@ -22,10 +22,10 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.wso2.carbon.identity.organization.management.service.OrganizationManager;
 import org.wso2.carbon.usage.data.collector.identity.counter.OrganizationCounter;
+import org.wso2.carbon.usage.data.collector.identity.counter.UserCounter;
 import org.wso2.carbon.user.api.Tenant;
 import org.wso2.carbon.user.core.service.RealmService;
 import org.wso2.carbon.user.core.tenant.TenantManager;
-import org.wso2.carbon.usage.data.collector.identity.counter.UserCounter;
 import org.wso2.carbon.usage.data.collector.identity.internal.UsageDataCollectorDataHolder;
 import org.wso2.carbon.usage.data.collector.identity.model.SystemUsage;
 import org.wso2.carbon.usage.data.collector.identity.model.TenantUsage;
@@ -122,8 +122,6 @@ public class UsageDataCollector {
 
             usage.setTotalB2BOrganizations(totalB2BOrgs.get());
             usage.setTotalUsers(totalUsers.get());
-
-            printReport(usage);
         } catch (Exception e) {
             log.error("Error calculating system statistics", e);
         }
@@ -150,25 +148,6 @@ public class UsageDataCollector {
             log.error("Error calculating user count for: " + tenantDomain, e);
         }
        return stats;
-    }
-
-    /**
-     * Print the report
-     */
-    private void printReport(SystemUsage report) {
-        log.info("\n========== SYSTEM STATISTICS REPORT ==========");
-        log.info("Root Tenant Count: " + report.getRootTenantCount());
-        log.info("Total B2B Organizations: " + report.getTotalB2BOrganizations());
-        log.info("Total Users: " + report.getTotalUsers());
-
-        if (report.getRootTenantCount() > 0) {
-            log.info("Average B2B Orgs per Tenant: " +
-                    String.format("%.2f", (double) report.getTotalB2BOrganizations() / report.getRootTenantCount()));
-            log.info("Average Users per Tenant: " +
-                    String.format("%.2f", (double) report.getTotalUsers() / report.getRootTenantCount()));
-        }
-
-        log.info("==============================================\n");
     }
 
     /**

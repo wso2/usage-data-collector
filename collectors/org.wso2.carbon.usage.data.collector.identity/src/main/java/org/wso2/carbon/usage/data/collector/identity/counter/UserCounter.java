@@ -18,69 +18,68 @@
 
 package org.wso2.carbon.usage.data.collector.identity.counter;
 
-import org.apache.commons.lang.StringUtils;
-import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.coyote.BadRequestException;
 import org.wso2.carbon.context.PrivilegedCarbonContext;
-import org.wso2.carbon.identity.core.util.IdentityUtil;
 import org.wso2.carbon.identity.organization.management.service.OrganizationManager;
-import org.wso2.carbon.usage.data.collector.identity.util.UsageCollectorConstants;
-import org.wso2.carbon.user.api.UserStoreException;
-import org.wso2.carbon.user.core.UserCoreConstants;
-import org.wso2.carbon.user.core.UserStoreClientException;
 import org.wso2.carbon.user.core.UserStoreManager;
 import org.wso2.carbon.user.core.common.AbstractUserStoreManager;
 import org.wso2.carbon.user.core.jdbc.JDBCUserStoreManager;
-import org.wso2.carbon.user.core.model.Condition;
 import org.wso2.carbon.user.core.model.ExpressionAttribute;
 import org.wso2.carbon.user.core.model.ExpressionCondition;
 import org.wso2.carbon.user.core.model.ExpressionOperation;
 import org.wso2.carbon.user.core.service.RealmService;
+import org.wso2.carbon.user.core.UserCoreConstants;
+import org.apache.commons.lang.StringUtils;
 
 import java.util.*;
 
 /**
- * Calculator for counting users across tenants and organizations
+ *  Counter to calculate total users in the system.
  */
 public class UserCounter {
 
     private static final Log log = LogFactory.getLog(UserCounter.class);
 
+    // Configuration
+    private static final String USERNAME_CLAIM = "http://wso2.org/claims/username";
+    private static final int LDAP_PAGE_SIZE = Integer.MAX_VALUE;
+    private static final int MAX_LDAP_ITERATIONS = 1000;
+    private static final long SLEEP_BETWEEN_REQUESTS_MS = 100; // 100ms
+    private static final long SLEEP_AFTER_BATCH_MS = 6_000;
+    private static final int BATCH_SIZE = 10;
+    private static final long SLEEP_AFTER_MAX_REQUESTS_MS = 5_000; // 5 seconds
+    private static final int MAX_REQUESTS_PER_MINUTE = 2;
+
     private final RealmService realmService;
     private final OrganizationManager organizationManager;
-    private static final String USERNAME_CLAIM = "http://wso2.org/claims/username";
-    private static final int LDAP_PAGE_SIZE = 100; // LDAP pagination page size
-    private static final int MAX_LDAP_ITERATIONS = 1000; // Safety limit
-
 
     public UserCounter(RealmService realmService, OrganizationManager organizationManager) {
 
         this.realmService = realmService;
         this.organizationManager = organizationManager;
     }
+
     /**
-     * Count all users in a tenant across all organizations
+     * Main method: Count all users in a tenant
      */
     public int countAllUsersInTenant(String tenantDomain) throws Exception {
 
-        log.debug("Counting users in tenant: " + tenantDomain);
-
-        // Get root organization ID
+        if (log.isDebugEnabled()) {
+            log.debug("Counting users in tenant: " + tenantDomain);
+        }
         String rootOrgId = organizationManager.resolveOrganizationId(tenantDomain);
-
         if (rootOrgId == null) {
             log.debug("No root organization found for tenant: " + tenantDomain);
             return 0;
         }
 
-        // Get all organization IDs in this tenant (root + children)
+        // Get all organizations (root + children)
         List<String> allOrgIds = new ArrayList<>();
         allOrgIds.add(rootOrgId);
 
         List<String> childOrgIds = organizationManager.getChildOrganizationsIds(rootOrgId, true);
-        if (childOrgIds != null && !childOrgIds.isEmpty()) {
+        if (childOrgIds != null) {
             allOrgIds.addAll(childOrgIds);
         }
 
@@ -97,13 +96,11 @@ public class UserCounter {
                 log.error("Error counting users in organization: " + orgId, e);
             }
         }
-
         return totalUsers;
     }
 
     /**
-     * Count users in a specific organization
-     * Works with all user store types
+     * Count users in tenant across all user stores
      */
     private int countUsersInOrganization(String organizationId) throws Exception {
 
@@ -116,245 +113,184 @@ public class UserCounter {
             PrivilegedCarbonContext.getThreadLocalCarbonContext().setTenantDomain(tenantDomain);
 
             UserStoreManager userStoreManager =
-                    (UserStoreManager) realmService.getTenantUserRealm(tenantId)
-                            .getUserStoreManager();
+                    (UserStoreManager) realmService.getTenantUserRealm(tenantId).getUserStoreManager();
 
-            return (int) getTotalUsersFromAllUserStores(userStoreManager);
+            return getTotalUsersFromAllDomains(userStoreManager);
 
         } finally {
             PrivilegedCarbonContext.endTenantFlow();
         }
     }
 
+    /**
+     * Get total users from all user store domains
+     */
+    private int getTotalUsersFromAllDomains(UserStoreManager userStoreManager) throws Exception {
 
-    private long getTotalUsersFromAllUserStores(UserStoreManager userStoreManager) throws Exception {
+        int totalUsers = 0;
+        String[] domains = getDomainNames(userStoreManager);
 
-        long totalUsers = 0;
-        String[] userStoreDomainNames = getDomainNames(userStoreManager);
-        boolean canCountTotalUserCount = canCountTotalUserCount(userStoreManager, userStoreDomainNames);
-        for (String userStoreDomainName : userStoreDomainNames) {
-            if (isJDBCUserStore(userStoreManager, userStoreDomainName)) {
-                totalUsers += getTotalUsers(userStoreManager, userStoreDomainName);
-            } else {
-                int maxLimit = Integer.MAX_VALUE;
-                if (isConsiderMaxLimitForTotalResultEnabled()) {
-                    maxLimit = getMaxLimit(userStoreDomainName, userStoreManager);
-                }
-                totalUsers += getUsersCountForListUsers(1, maxLimit, userStoreDomainName, userStoreManager);
+        for (String domain : domains) {
+            try {
+                int count = isJDBCUserStore(userStoreManager, domain)
+                        ? countJDBCUsers(userStoreManager, domain)
+                        : countLDAPUsers(userStoreManager, domain);
+
+                totalUsers += count;
+            } catch (Exception e) {
+                log.error("Error counting users in domain: " + domain, e);
             }
         }
 
         return totalUsers;
-    }
-
-    private int getMaxLimit(String domainName, UserStoreManager userStoreManager) {
-
-        int givenMax = UserCoreConstants.MAX_USER_ROLE_LIST;
-        if (StringUtils.isEmpty(domainName)) {
-            domainName = getPrimaryUserStoreDomain(userStoreManager);
-            if (log.isDebugEnabled()) {
-                log.debug("Primary user store DomainName picked as " + domainName);
-            }
-        }
-        if (userStoreManager.getSecondaryUserStoreManager(domainName).getRealmConfiguration()
-                .getUserStoreProperty(UserCoreConstants.RealmConfig.PROPERTY_MAX_USER_LIST) != null) {
-            givenMax = Integer.parseInt(userStoreManager.getSecondaryUserStoreManager(domainName).getRealmConfiguration()
-                    .getUserStoreProperty(UserCoreConstants.RealmConfig.PROPERTY_MAX_USER_LIST));
-        }
-
-        return givenMax;
-    }
-
-    private boolean canCountTotalUserCount(UserStoreManager userStoreManager, String[] userStoreDomainNames) {
-
-        for (String userStoreDomainName : userStoreDomainNames) {
-            if (!isJDBCUserStore(userStoreManager, userStoreDomainName)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private boolean isJDBCUserStore(UserStoreManager userStoreManager, String userStoreDomainName) {
-
-        AbstractUserStoreManager secondaryUserStoreManager = (AbstractUserStoreManager) userStoreManager
-                .getSecondaryUserStoreManager(userStoreDomainName);
-        return secondaryUserStoreManager instanceof JDBCUserStoreManager;
-    }
-
-    private long getTotalUsers(UserStoreManager userStoreManager, String domainName) throws Exception {
-
-        long totalUsers = 0;
-        AbstractUserStoreManager secondaryUserStoreManager = null;
-        if (StringUtils.isNotBlank(domainName)) {
-            secondaryUserStoreManager = (AbstractUserStoreManager) userStoreManager
-                    .getSecondaryUserStoreManager(domainName);
-        }
-        try {
-            if (secondaryUserStoreManager instanceof JDBCUserStoreManager) {
-                totalUsers = secondaryUserStoreManager.countUsersWithClaims(USERNAME_CLAIM, "*");
-            }
-        } catch (org.wso2.carbon.user.core.UserStoreException e) {
-            log.error( "Error while getting total user count in domain: " + domainName);
-        }
-        return totalUsers;
-    }
-
-    private String[] getDomainNames(UserStoreManager userStoreManager) {
-
-        String domainName;
-        ArrayList<String> domainsOfUserStores = new ArrayList<>();
-        UserStoreManager secondaryUserStore = userStoreManager.getSecondaryUserStoreManager();
-        while (secondaryUserStore != null) {
-            domainName = secondaryUserStore.getRealmConfiguration().
-                    getUserStoreProperty(UserCoreConstants.RealmConfig.PROPERTY_DOMAIN_NAME).toUpperCase();
-            secondaryUserStore = secondaryUserStore.getSecondaryUserStoreManager();
-            domainsOfUserStores.add(domainName);
-        }
-        // Sorting the secondary user stores to maintain an order fo domains so that pagination is consistent.
-        Collections.sort(domainsOfUserStores);
-
-        String primaryUSDomain = getPrimaryUserStoreDomain(userStoreManager);
-
-        // Append the primary domain name to the front of the domain list since the first iteration of multiple
-        // domain filtering should happen for the primary user store.
-        domainsOfUserStores.add(0, primaryUSDomain);
-        return domainsOfUserStores.toArray(new String[0]);
-    }
-
-    private String getPrimaryUserStoreDomain(UserStoreManager userStoreManager) {
-
-        String primaryUSDomain = userStoreManager.getRealmConfiguration().getUserStoreProperty(UserCoreConstants.
-                RealmConfig.PROPERTY_DOMAIN_NAME);
-        if (StringUtils.isEmpty(primaryUSDomain)) {
-            primaryUSDomain = UserCoreConstants.PRIMARY_DEFAULT_DOMAIN_NAME;
-        }
-        return primaryUSDomain;
-    }
-
-    private int getUsersCountForListUsers(int offset, int maxLimit, String domainName,
-                                          UserStoreManager userStoreManager) throws Exception {
-
-        ExpressionCondition condition = new ExpressionCondition(ExpressionOperation.SW.toString(),
-                ExpressionAttribute.USERNAME.toString(), "");
-        if (StringUtils.isNotEmpty(domainName)) {
-//            return getFilteredUserCountFromSingleDomain(condition, offset, maxLimit, domainName,
-//                    (AbstractUserStoreManager) userStoreManager);
-            return (int) getFilteredUserCountWithPagination(condition, domainName,
-                    (AbstractUserStoreManager) userStoreManager);
-        }
-        else {
-            log.error("Domain name cannot be empty");
-            return 0;
-        }
-    }
-
-    private int getFilteredUserCountFromSingleDomain(Condition condition, int offset, int limit, String domainName,
-                                                     AbstractUserStoreManager userStoreManager )
-            throws Exception {
-
-        if (log.isDebugEnabled()) {
-            log.debug(String.format("Getting the filtered users count in domain : %s with limit: %d and offset: %d.",
-                    domainName, limit, offset));
-        }
-        try {
-            return userStoreManager.getUsersCount(condition, domainName, UserCoreConstants.DEFAULT_PROFILE, limit, offset,
-                    isRemoveDuplicateUsersInUsersResponseEnabled());
-        } catch (UserStoreException e) {
-            // Sometimes client exceptions are wrapped in the super class.
-            // Therefore checking for possible client exception.
-            Throwable rootCause = ExceptionUtils.getRootCause(e);
-            String errorMessage = String.format(
-                    "Error while retrieving filtered users count for the domain: %s with limit: %d and offset: %d. %s",
-                    domainName, limit, offset, rootCause != null ? rootCause.getMessage() : e.getMessage());
-            if (log.isDebugEnabled()) {
-                log.debug(errorMessage, e);
-            }
-            if (e instanceof UserStoreClientException || rootCause instanceof UserStoreClientException) {
-                throw new BadRequestException(errorMessage);
-            } else {
-                throw new Exception(errorMessage, e);
-            }
-        }
     }
 
     /**
-     * Enhanced: Get filtered user count with pagination (for LDAP/AD stores)
-     * Loops through all pages to get accurate total count
+     * Count users in JDBC domain (fast, direct count query).
      */
-    private long getFilteredUserCountWithPagination(Condition condition, String domainName,
-                                                    AbstractUserStoreManager userStoreManager)
-            throws Exception {
+    private int countJDBCUsers(UserStoreManager userStoreManager, String domain) throws Exception {
 
-        long totalCount = 0;
+        AbstractUserStoreManager abstractUSM =
+                (AbstractUserStoreManager) userStoreManager.getSecondaryUserStoreManager(domain);
+
+        if (abstractUSM instanceof JDBCUserStoreManager) {
+            return (int) abstractUSM.countUsersWithClaims(USERNAME_CLAIM, "*");
+        }
+        return 0;
+    }
+
+    /**
+     * Count users in LDAP domain (with pagination and rate limiting)
+     */
+    private int countLDAPUsers(UserStoreManager userStoreManager, String domain) throws Exception {
+
+
+        int totalCount = 0;
         int offset = 0;
-        int limit = LDAP_PAGE_SIZE;
         int iteration = 0;
 
         if (log.isDebugEnabled()) {
-            log.debug("Starting paginated count for LDAP domain: " + domainName);
+            log.debug("Starting paginated count for LDAP domain: " + domain);
         }
-
         while (iteration < MAX_LDAP_ITERATIONS) {
             try {
-                // Get count for this page
-                int pageCount = getFilteredUserCountFromSingleDomain(condition,
-                        offset, limit, domainName, userStoreManager);
+                // Rate limiting
+//                if (iteration > 0) {
+//                    Thread.sleep(SLEEP_BETWEEN_REQUESTS_MS);
+//                    if (iteration % BATCH_SIZE == 0) {
+//                        log.info(String.format("Processed %d batches. Sleeping %dms...",
+//                                iteration, SLEEP_AFTER_BATCH_MS));
+//                        Thread.sleep(SLEEP_AFTER_BATCH_MS);
+//                    }
+//                }
 
-                if (log.isDebugEnabled()) {
-                    log.debug(String.format("Domain: %s, Offset: %d, Limit: %d, Page Count: %d",
-                            domainName, offset, limit, pageCount));
+                // Apply rate limiting before request
+                if (iteration > 0) {
+                    applyRateLimiting(iteration);
                 }
 
-                if (pageCount == 0) {
-                    // No more users, exit loop
+                ExpressionCondition condition = new ExpressionCondition(ExpressionOperation.SW.toString(),
+                        ExpressionAttribute.USERNAME.toString(), "");
+
+                // Get page count
+                int pageCount = ((AbstractUserStoreManager) userStoreManager).getUsersCount(
+                        condition,
+                        domain,
+                        UserCoreConstants.DEFAULT_PROFILE,
+                        LDAP_PAGE_SIZE,
+                        offset,
+                        false
+                );
+
+                if (pageCount == 0 || pageCount < LDAP_PAGE_SIZE) {
+                    totalCount += pageCount;
                     break;
                 }
 
                 totalCount += pageCount;
-
-                // If we got fewer users than the limit, we've reached the end
-                if (pageCount < limit) {
-                    break;
-                }
-
-                // Move to next page
-                offset += limit;
+                offset += LDAP_PAGE_SIZE;
                 iteration++;
-
+            } catch (InterruptedException e) {
+                log.warn("Thread interrupted during rate limiting sleep", e);
+                Thread.currentThread().interrupt();
+                break;
             } catch (Exception e) {
-                log.error(String.format("Error getting users at offset %d for domain %s",
-                        offset, domainName), e);
-                // Don't throw - return what we've counted so far
+                log.error("Error at offset " + offset + " for domain " + domain, e);
                 break;
             }
         }
 
-        if (iteration >= MAX_LDAP_ITERATIONS) {
-            log.warn(String.format("Reached maximum iteration limit (%d) for domain %s. " +
-                    "Count may be incomplete.", MAX_LDAP_ITERATIONS, domainName));
+        if (log.isDebugEnabled()) {
+            log.debug(String.format("LDAP domain '%s' total: %d users (%d iterations)",
+                    domain, totalCount, iteration + 1));
         }
-
-        log.info(String.format("Paginated total count for domain '%s': %d (iterations: %d)",
-                domainName, totalCount, iteration));
-
         return totalCount;
     }
 
-    private boolean isRemoveDuplicateUsersInUsersResponseEnabled() {
+    /**
+     * Get all domain names (PRIMARY + secondary).
+     */
+    private String[] getDomainNames(UserStoreManager userStoreManager) {
 
-        String removeDuplicateUsersInUsersResponse =
-                IdentityUtil.getProperty(UsageCollectorConstants.SCIM_2_REMOVE_DUPLICATE_USERS_IN_USERS_RESPONSE);
-        if (StringUtils.isNotBlank(removeDuplicateUsersInUsersResponse)) {
-            return Boolean.parseBoolean(removeDuplicateUsersInUsersResponse);
+        List<String> domains = new ArrayList<>();
+
+        // Add primary domain
+        String primaryDomain = userStoreManager.getRealmConfiguration()
+                .getUserStoreProperty(UserCoreConstants.RealmConfig.PROPERTY_DOMAIN_NAME);
+        domains.add(StringUtils.isEmpty(primaryDomain) ?
+                UserCoreConstants.PRIMARY_DEFAULT_DOMAIN_NAME : primaryDomain);
+
+        // Add secondary domains
+        UserStoreManager secondary = userStoreManager.getSecondaryUserStoreManager();
+        while (secondary != null) {
+            String domain = secondary.getRealmConfiguration()
+                    .getUserStoreProperty(UserCoreConstants.RealmConfig.PROPERTY_DOMAIN_NAME);
+            if (domain != null) {
+                domains.add(domain.toUpperCase());
+            }
+            secondary = secondary.getSecondaryUserStoreManager();
         }
-        return false;
+        // Sorting the secondary user stores to maintain an order of domains so that pagination is consistent.
+        Collections.sort(domains.subList(1, domains.size()));
+        return domains.toArray(new String[0]);
     }
 
-    public static boolean isConsiderMaxLimitForTotalResultEnabled() {
+    /**
+     * Check if given domain is JDBC user store.
+     */
+    private boolean isJDBCUserStore(UserStoreManager userStoreManager, String domain) {
 
-        return Boolean.parseBoolean(IdentityUtil
-                .getProperty(UsageCollectorConstants.SCIM_ENABLE_CONSIDER_MAX_LIMIT_FOR_TOTAL_RESULT));
+        try {
+            AbstractUserStoreManager abstractUSM =
+                    (AbstractUserStoreManager) userStoreManager.getSecondaryUserStoreManager(domain);
+            return abstractUSM instanceof JDBCUserStoreManager;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
+    /**
+     * Apply rate limiting to protect database
+     * - Sleeps 100ms between every request
+     * - Sleeps 6 seconds after every 10 requests
+     */
+    private void applyRateLimiting(int iteration) throws InterruptedException {
+
+        // Always sleep a bit between requests
+        Thread.sleep(SLEEP_BETWEEN_REQUESTS_MS);
+
+        // After take a longer break after certain request count.
+        if (iteration % MAX_REQUESTS_PER_MINUTE == 0) {
+            log.debug(String.format("Rate limit checkpoint reached (%d requests). Sleeping for %dms",
+                    iteration, SLEEP_AFTER_MAX_REQUESTS_MS));
+            Thread.sleep(SLEEP_AFTER_MAX_REQUESTS_MS);
+            log.debug("Resumed after rate limit sleep");
+        }
+
+        // After 5000 users enforce another sleep.
+        if (iteration % 50 == 0) {
+            Thread.sleep(SLEEP_AFTER_MAX_REQUESTS_MS);
+            log.debug(String.format("Progress: %d iterations completed", iteration));
+        }
+    }
 }

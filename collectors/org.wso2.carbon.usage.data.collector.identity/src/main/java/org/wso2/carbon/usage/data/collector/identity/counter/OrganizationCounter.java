@@ -25,7 +25,7 @@ import org.wso2.carbon.identity.organization.management.service.OrganizationMana
 import java.util.List;
 
 /**
- * Calculator for counting B2B organizations in tenants
+ *  Counter to calculate total B2B organizations in the system.
  */
 public class OrganizationCounter {
 
