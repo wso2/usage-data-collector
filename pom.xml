@@ -36,7 +36,10 @@
     <description>Parent POM for Usage Data Collector modules</description>
 
     <modules>
-        <module>collectors</module>
+        <module>collectors/org.wso2.carbon.usage.data.collector.apim</module>
+        <module>collectors/org.wso2.carbon.usage.data.collector.identity</module>
+        <module>collectors/org.wso2.carbon.usage.data.collector.mi</module>
+        <module>collectors/org.wso2.carbon.usage.data.collector.common</module>
     </modules>
 
     <properties>
