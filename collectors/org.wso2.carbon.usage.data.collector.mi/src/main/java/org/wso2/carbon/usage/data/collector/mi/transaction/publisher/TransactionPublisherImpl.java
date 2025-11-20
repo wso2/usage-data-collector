@@ -190,10 +190,9 @@ public class TransactionPublisherImpl implements TransactionPublisher {
             return false;
         }
         try {
-            // Collect and publish immediately
-            long count = aggregator.getCurrentHourlyCount();
-            long hourStartTime = System.currentTimeMillis();
-            long hourEndTime = hourStartTime;
+            long count = aggregator.getAndResetCurrentHourlyCount();
+            long hourStartTime = aggregator.getCurrentHourStartTime();
+            long hourEndTime = System.currentTimeMillis();
             org.wso2.carbon.usage.data.collector.mi.transaction.record.TransactionReport report =
                 new org.wso2.carbon.usage.data.collector.mi.transaction.record.TransactionReport(
                     count, hourStartTime, hourEndTime);

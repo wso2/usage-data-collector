@@ -30,6 +30,10 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class TransactionAggregator {
 
+    public long getCurrentHourStartTime() {
+        return currentHourStartTime;
+    }
+
     private static final Log LOG = LogFactory.getLog(TransactionAggregator.class);
     private static TransactionAggregator instance = null;
     
@@ -47,29 +51,53 @@ public class TransactionAggregator {
         }
         return instance;
     }
-
+    
     public void init(TransactionPublisher publisher) {
         if (publisher == null) {
             LOG.warn("TransactionPublisher is null. Hourly aggregation will be disabled.");
             return;
         }
 
+        // If executor already exists and is active, skip re-init
+        if (scheduledExecutorService != null && !scheduledExecutorService.isShutdown() && enabled) {
+            LOG.info("TransactionAggregator is already initialized and running. Skipping re-initialization.");
+            return;
+        }
+
+        // If executor exists (whether shut down or not), clean it up before re-init
+        if (scheduledExecutorService != null) {
+            LOG.info("Cleaning up existing TransactionAggregator executor before re-initialization.");
+
+            scheduledExecutorService.shutdownNow();
+            try {
+                if (!scheduledExecutorService.awaitTermination(5, TimeUnit.SECONDS)) {
+                    LOG.warn("Existing TransactionAggregator executor did not terminate in time");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                LOG.error("Interrupted while shutting down executor", e);
+            }
+
+            scheduledExecutorService = null;
+        }
+
+        // Fresh initialization
         this.publisher = publisher;
         this.currentHourStartTime = System.currentTimeMillis();
         this.scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
 
-        long publishInterval = 30000L;
-        long initialDelay = 30000L;
+        long interval = 30000L;
 
         scheduledExecutorService.scheduleAtFixedRate(
-            this::publishAndReset,
-            initialDelay,
-            publishInterval,
-            TimeUnit.MILLISECONDS
+                this::publishAndReset,
+                interval,
+                interval,
+                TimeUnit.MILLISECONDS
         );
 
         this.enabled = true;
     }
+
 
     public void addTransactions(int count) {
         if (!enabled || count <= 0) {
@@ -97,6 +125,10 @@ public class TransactionAggregator {
         } catch (Exception e) {
             LOG.error("TransactionAggregator: Error while publishing hourly transaction count", e);
         }
+    }
+
+    public long getAndResetCurrentHourlyCount() {
+        return hourlyTransactionCount.getAndSet(0);
     }
 
     public long getCurrentHourlyCount() {

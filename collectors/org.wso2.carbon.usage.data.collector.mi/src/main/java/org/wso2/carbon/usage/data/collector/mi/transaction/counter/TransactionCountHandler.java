@@ -37,13 +37,19 @@ public class TransactionCountHandler extends AbstractExtendedSynapseHandler {
             if (instance == null) {
                 instance = new TransactionCountHandler();
             }
-            
             instance.publisher = reporter;
             instance.transactionAggregator = TransactionAggregator.getInstance();
-            instance.transactionAggregator.init(reporter);
+            // Only initialize if not already enabled
+            if (!instance.transactionAggregator.isEnabled()) {
+                instance.transactionAggregator.init(reporter);
+            }
             enabled = true;
         } else {
             instance.publisher = reporter;
+            // Only initialize if not already enabled
+            if (!instance.transactionAggregator.isEnabled()) {
+                instance.transactionAggregator.init(reporter);
+            }
         }
     }
     
