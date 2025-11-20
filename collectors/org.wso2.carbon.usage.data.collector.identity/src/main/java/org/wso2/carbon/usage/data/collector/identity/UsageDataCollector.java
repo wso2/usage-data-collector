@@ -32,12 +32,16 @@ import org.wso2.carbon.usage.data.collector.identity.model.TenantUsage;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.*;
+
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Main service for collecting usage statistics
- * Orchestrates the calculator classes to gather system-wide statistics
+ * Main service for collecting usage statistics.
+ * Orchestrates the calculator classes to gather system-wide statistics.
  */
 public class UsageDataCollector {
 
@@ -63,6 +67,9 @@ public class UsageDataCollector {
 
     public void collectAndPublish() {
 
+        SystemUsage report = this.collectSystemStatistics();
+        //Todo: need to implement http publisher part.
+        publish(report);
     }
 
     /**
@@ -167,5 +174,24 @@ public class UsageDataCollector {
             }
         }
         log.debug("Usage Data Collector Service is shutdown.");
+    }
+
+    // Todo: Need to remove this logic after implementing publisher.
+    private void publish(SystemUsage report) {
+
+        if (report == null) {
+            log.warn("No statistics report available");
+            return;
+        }
+
+        log.info("\n" +
+                "╔════════════════════════════════════════════════════════════╗\n" +
+                "║           USAGE STATISTICS REPORT                          ║\n" +
+                "╠════════════════════════════════════════════════════════════╣\n" +
+                String.format("║ Root Tenant Count:        %-28d ║\n", report.getRootTenantCount()) +
+                String.format("║ Total B2B Organizations:  %-28d ║\n", report.getTotalB2BOrganizations()) +
+                String.format("║ Total Users:              %-28d ║\n", report.getTotalUsers()) +
+                "╚════════════════════════════════════════════════════════════╝"
+        );
     }
 }

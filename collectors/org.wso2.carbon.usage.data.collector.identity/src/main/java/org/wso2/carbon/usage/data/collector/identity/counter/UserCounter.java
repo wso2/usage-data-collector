@@ -32,7 +32,9 @@ import org.wso2.carbon.user.core.service.RealmService;
 import org.wso2.carbon.user.core.UserCoreConstants;
 import org.apache.commons.lang.StringUtils;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 /**
  *  Counter to calculate total users in the system.
@@ -43,7 +45,7 @@ public class UserCounter {
 
     // Configuration
     private static final String USERNAME_CLAIM = "http://wso2.org/claims/username";
-    private static final int LDAP_PAGE_SIZE = Integer.MAX_VALUE;
+    private static final int LDAP_PAGE_SIZE = 100;
     private static final int MAX_LDAP_ITERATIONS = 1000;
     private static final long SLEEP_BETWEEN_REQUESTS_MS = 100; // 100ms
     private static final long SLEEP_AFTER_BATCH_MS = 6_000;

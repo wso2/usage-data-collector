@@ -21,6 +21,9 @@ package org.wso2.carbon.usage.data.collector.identity;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+/**
+ * Runs the usage data collection task.
+ */
 public class UsageDataCollectorTask implements Runnable {
 
     private static final Log log = LogFactory.getLog(UsageDataCollectorTask.class);

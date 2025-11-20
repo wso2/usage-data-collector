@@ -29,17 +29,17 @@ import org.osgi.service.component.annotations.ReferenceCardinality;
 import org.osgi.service.component.annotations.ReferencePolicy;
 import org.wso2.carbon.identity.organization.management.service.OrganizationManager;
 import org.wso2.carbon.usage.data.collector.identity.UsageDataCollector;
-import org.wso2.carbon.usage.data.collector.identity.model.SystemUsage;
+import org.wso2.carbon.usage.data.collector.identity.UsageDataCollectorTask;
 import org.wso2.carbon.user.core.service.RealmService;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-
 /**
- * OSGi service component for the Deployment Data Collector.
- * Manages the lifecycle and scheduling of deployment data collection.
+ *
+ * Manages the lifecycle and scheduling of usage data collection.
  */
 @Component(
     name = "org.wso2.carbon.deployment.data.collector",
@@ -49,76 +49,74 @@ public class UsageDataCollectorServiceComponent {
 
     private static final Log log = LogFactory.getLog(UsageDataCollectorServiceComponent.class);
 
+    // Configuration constants
+    private static final long INITIAL_DELAY_SECONDS = 30;
+    private static final long INTERVAL_SECONDS = 60;
+    private static final long SHUTDOWN_TIMEOUT_SECONDS = 10;
+
     private UsageDataCollector collectorService;
     private ScheduledExecutorService scheduler;
+    private ScheduledFuture<?> scheduledTask;
 
     @Activate
     protected void activate(ComponentContext context) {
         try {
-            log.info("========== UsageDataCollectorServiceComponent Activating ==========");
-            collectorService = new UsageDataCollector();
-            schedulePeriodicReport2();
 
-            log.info("UsageDataCollectorServiceComponent activated successfully");
+            collectorService = new UsageDataCollector();
+
+            scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread thread = new Thread(r, "IS-UsageDataCollector-Thread");
+                thread.setDaemon(true);
+                return thread;
+            });
+
+            scheduledTask = scheduler.scheduleAtFixedRate(
+                    new UsageDataCollectorTask(collectorService),
+                    INITIAL_DELAY_SECONDS,
+                    INTERVAL_SECONDS,
+                    TimeUnit.SECONDS
+            );
+
+            log.debug("UsageDataCollectorServiceComponent activated successfully");
 
         } catch (Exception e) {
             log.error("Error activating UsageDataCollectorServiceComponent", e);
+            cleanup();
         }
     }
 
     @Deactivate
     protected void deactivate(ComponentContext context) {
-        try {
-            if (collectorService != null) {
-                collectorService.shutdown();
-            }
-            log.info("UsageDataCollectorServiceComponent deactivated successfully");
-
-        } catch (Exception e) {
-            log.error("Error deactivating UsageDataCollectorServiceComponent", e);
-        }
+        cleanup();
+        log.debug("UsageDataCollectorServiceComponent deactivated successfully");
     }
 
-    private void logReport(SystemUsage report) {
-        if (report == null) {
-            log.warn("No statistics report available");
-            return;
+    private void cleanup() {
+
+        if (scheduledTask != null) {
+            scheduledTask.cancel(false);
         }
 
-        log.info("\n" +
-                "╔════════════════════════════════════════════════════════════╗\n" +
-                "║           USAGE STATISTICS REPORT                          ║\n" +
-                "╠════════════════════════════════════════════════════════════╣\n" +
-                String.format("║ Root Tenant Count:        %-28d ║\n", report.getRootTenantCount()) +
-                String.format("║ Total B2B Organizations:  %-28d ║\n", report.getTotalB2BOrganizations()) +
-                String.format("║ Total Users:              %-28d ║\n", report.getTotalUsers()) +
-                "╚════════════════════════════════════════════════════════════╝"
-        );
-    }
-
-    /**
-     * Schedule periodic report generation
-     */
-    private void schedulePeriodicReport2() {
-
-        scheduler = Executors.newSingleThreadScheduledExecutor();
-
-        scheduler.scheduleWithFixedDelay(() -> {
+        if (scheduler != null) {
+            scheduler.shutdown();
             try {
-                log.info("Running scheduled system statistics calculation...");
-                long startTime = System.currentTimeMillis();
-                SystemUsage report = collectorService.collectSystemStatistics();
-
-                long duration = System.currentTimeMillis() - startTime;
-                log.info("Scheduled Report completed in " + duration + "ms");
-                // Log formatted report
-                logReport(report);
-            } catch (Exception e) {
-                log.error("Error in scheduled statistics calculation", e);
+                if (!scheduler.awaitTermination(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                    scheduler.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                scheduler.shutdownNow();
+                Thread.currentThread().interrupt();
             }
-        }, 0, 2, TimeUnit.MINUTES);  // Initial delay: 12 hours, Period: 12 hours
-    }
+        }
 
+        if (collectorService != null) {
+            try {
+                collectorService.shutdown();
+            } catch (Exception e) {
+                log.error("Error shutting down collector service", e);
+            }
+        }
+    }
 
     @Reference(name = "user.realm.service.default",
             service = RealmService.class,

@@ -18,6 +18,9 @@
 
 package org.wso2.carbon.usage.data.collector.identity.util;
 
+/**
+ * Constants related to usage collection.
+ */
 public class UsageCollectorConstants {
 
     public static final String SCIM_2_REMOVE_DUPLICATE_USERS_IN_USERS_RESPONSE =

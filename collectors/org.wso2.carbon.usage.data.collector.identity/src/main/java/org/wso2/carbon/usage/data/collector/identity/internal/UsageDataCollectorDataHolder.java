@@ -21,6 +21,9 @@ package org.wso2.carbon.usage.data.collector.identity.internal;
 import org.wso2.carbon.identity.organization.management.service.OrganizationManager;
 import org.wso2.carbon.user.core.service.RealmService;
 
+/**
+ * Data holder for usage data collector.
+ */
 public class UsageDataCollectorDataHolder {
 
     private static UsageDataCollectorDataHolder instance = new UsageDataCollectorDataHolder();
