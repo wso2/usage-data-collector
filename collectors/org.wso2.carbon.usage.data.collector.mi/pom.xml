@@ -35,6 +35,12 @@
     <description>Usage Data Collector for Micro Integrator with scheduler and utility code</description>
 
     <dependencies>
+        <!-- Jackson for JSON serialization -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>2.15.2</version>
+        </dependency>
         <!-- Common Publisher API -->
         <dependency>
             <groupId>org.wso2.carbon</groupId>

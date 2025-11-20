@@ -32,11 +32,8 @@ import java.sql.SQLException;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Deactivate;
 
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.util.EntityUtils;
 
 /**
@@ -48,62 +45,64 @@ import org.apache.http.util.EntityUtils;
     immediate = true
 )
 public class PublisherImpl implements Publisher {
-
-    private static final Log log = LogFactory.getLog(PublisherImpl.class);
-    
     @Activate
     protected void activate() {}
-    
-    @Deactivate 
+
+    @Deactivate
     protected void deactivate() {}
-    
+
+    private static final Log log = LogFactory.getLog(PublisherImpl.class);
     private static final String DATASOURCE_NAME = "WSO2_CONSUMPTION_TRACKING_DB";
     private static final String RECEIVER_ENDPOINT = "http://localhost:8081/api/receiver";
     private static final String WSO2_ENDPOINT = "https://api.wso2.com/usage-data";
 
     @Override
     public DataSource getDataSource() throws PublisherException {
-    try {
-        DataSourceProvider provider = DataSourceProvider.getInstance();
-        if (!provider.isInitialized()) {
-            provider.initialize(DATASOURCE_NAME);
-        }
-        return provider.getDataSource();
-    } catch (SQLException e) {
-        String errorMsg = "Failed to get datasource: " + DATASOURCE_NAME;
-        log.error(errorMsg, e);
+        try {
+            DataSourceProvider provider = DataSourceProvider.getInstance();
+            if (!provider.isInitialized()) {
+                provider.initialize(DATASOURCE_NAME);
+            }
+            return provider.getDataSource();
+        } catch (SQLException e) {
+            String errorMsg = "Failed to get datasource: " + DATASOURCE_NAME;
+            log.error(errorMsg, e);
             throw new PublisherException(errorMsg, e);
         }
     }
 
     @Override
     public ApiResponse callReceiverApi(ApiRequest request) throws PublisherException {
-        try {
-            String jsonData = "{}";
-            if (request.getData() != null) {
-                jsonData = request.getData().toJson();
-            }
-            
-            HttpClient httpClient = new DefaultHttpClient();
+        int timeoutMs = 5000;
+        Integer reqTimeout = request.getTimeoutMs();
+        if (reqTimeout != null && reqTimeout > 0) {
+            timeoutMs = reqTimeout;
+        }
+        String jsonData = "{}";
+        if (request.getData() != null) {
+            jsonData = request.getData().toJson();
+        }
+        org.apache.http.client.config.RequestConfig requestConfig = org.apache.http.client.config.RequestConfig.custom()
+                .setConnectTimeout(timeoutMs)
+                .setConnectionRequestTimeout(timeoutMs)
+                .setSocketTimeout(timeoutMs)
+                .build();
+        try (org.apache.http.impl.client.CloseableHttpClient httpClient = org.apache.http.impl.client.HttpClients.createDefault()) {
             HttpPost httpPost = new HttpPost(RECEIVER_ENDPOINT);
-            
+            httpPost.setConfig(requestConfig);
             httpPost.setHeader("Content-Type", "application/json");
             httpPost.setHeader("Accept", "application/json");
             httpPost.setHeader("User-Agent", "WSO2-Usage-Data-Collector/1.0");
-            
-            StringEntity entity = new StringEntity(jsonData, "UTF-8");
-            httpPost.setEntity(entity);
-            
-            HttpResponse response = httpClient.execute(httpPost);
-            int statusCode = response.getStatusLine().getStatusCode();
-            String responseBody = EntityUtils.toString(response.getEntity());
-            
-            if (statusCode >= 200 && statusCode < 300) {
-                return ApiResponse.success(statusCode, responseBody);
-            } else {
-                return ApiResponse.failure(statusCode, "HTTP error: " + statusCode + " - " + responseBody);
+            httpPost.setEntity(new StringEntity(jsonData, "UTF-8"));
+            try (org.apache.http.client.methods.CloseableHttpResponse response = httpClient.execute(httpPost)) {
+                int statusCode = response.getStatusLine().getStatusCode();
+                String responseBody = EntityUtils.toString(response.getEntity());
+                if (statusCode >= 200 && statusCode < 300) {
+                    return ApiResponse.success(statusCode, responseBody);
+                } else {
+                    return ApiResponse.failure(statusCode, "HTTP error: " + statusCode + " - " + responseBody);
+                }
             }
-            
         } catch (Exception e) {
             String errorMsg = "PublisherImpl: Failed to call receiver API at " + RECEIVER_ENDPOINT;
             log.error(errorMsg, e);
@@ -113,37 +112,40 @@ public class PublisherImpl implements Publisher {
 
     @Override
     public ApiResponse callWso2Api(ApiRequest request) throws PublisherException {
-        try {
-            String jsonData = "{}";
-            if (request.getData() != null) {
-                jsonData = request.getData().toJson();
-            }
-            
-            HttpClient httpClient = new DefaultHttpClient();
+        int timeoutMs = 5000;
+        Integer reqTimeout = request.getTimeoutMs();
+        if (reqTimeout != null && reqTimeout > 0) {
+            timeoutMs = reqTimeout;
+        }
+        String jsonData = "{}";
+        if (request.getData() != null) {
+            jsonData = request.getData().toJson();
+        }
+        org.apache.http.client.config.RequestConfig requestConfig = org.apache.http.client.config.RequestConfig.custom()
+                .setConnectTimeout(timeoutMs)
+                .setConnectionRequestTimeout(timeoutMs)
+                .setSocketTimeout(timeoutMs)
+                .build();
+        try (org.apache.http.impl.client.CloseableHttpClient httpClient = org.apache.http.impl.client.HttpClients.createDefault()) {
             HttpPost httpPost = new HttpPost(WSO2_ENDPOINT);
-            
+            httpPost.setConfig(requestConfig);
             httpPost.setHeader("Content-Type", "application/json");
             httpPost.setHeader("Accept", "application/json");
             httpPost.setHeader("User-Agent", "WSO2-Usage-Data-Collector/1.0");
-            
-            StringEntity entity = new StringEntity(jsonData, "UTF-8");
-            httpPost.setEntity(entity);
-            
-            HttpResponse response = httpClient.execute(httpPost);
-            int statusCode = response.getStatusLine().getStatusCode();
-            String responseBody = EntityUtils.toString(response.getEntity());
-            
-            if (statusCode >= 200 && statusCode < 300) {
-                return ApiResponse.success(statusCode, responseBody);
-            } else {
-                return ApiResponse.failure(statusCode, "HTTP error: " + statusCode + " - " + responseBody);
+            httpPost.setEntity(new StringEntity(jsonData, "UTF-8"));
+            try (org.apache.http.client.methods.CloseableHttpResponse response = httpClient.execute(httpPost)) {
+                int statusCode = response.getStatusLine().getStatusCode();
+                String responseBody = EntityUtils.toString(response.getEntity());
+                if (statusCode >= 200 && statusCode < 300) {
+                    return ApiResponse.success(statusCode, responseBody);
+                } else {
+                    return ApiResponse.failure(statusCode, "HTTP error: " + statusCode + " - " + responseBody);
+                }
             }
-            
         } catch (Exception e) {
             String errorMsg = "PublisherImpl: Failed to call external WSO2 API at " + WSO2_ENDPOINT;
             log.error(errorMsg, e);
             throw new PublisherException(errorMsg, e);
         }
     }
-
 }

@@ -25,23 +25,30 @@ public class TransactionCountingLogic {
 
     public static int handleRequestInFlow(MessageContext messageContext) {
         if (messageContext != null) {
-            org.apache.axis2.context.MessageContext axis2MessageContext =
-                    ((Axis2MessageContext) messageContext).getAxis2MessageContext();
+            org.apache.axis2.context.MessageContext axis2MessageContext = null;
+            if (messageContext instanceof Axis2MessageContext) {
+                axis2MessageContext = ((Axis2MessageContext) messageContext).getAxis2MessageContext();
+            }
+            if (axis2MessageContext != null) {
+                // Setting this property to identify request-response pairs
+                messageContext.setProperty(TransactionCounterConstants.IS_THERE_ASSOCIATED_INCOMING_REQUEST, true);
 
-            // Setting this property to identify request-response pairs
-            messageContext.setProperty(TransactionCounterConstants.IS_THERE_ASSOCIATED_INCOMING_REQUEST, true);
-
-            // Counting message received via an open WebSocket
-            String transport = axis2MessageContext.getIncomingTransportName();
-            if (transport.equals(TransactionCounterConstants.TRANSPORT_WS) ||
-                    transport.equals(TransactionCounterConstants.TRANSPORT_WSS)){
-                return 1;
+                // Counting message received via an open WebSocket
+                String transport = axis2MessageContext.getIncomingTransportName();
+                if (transport != null &&
+                        (transport.equals(TransactionCounterConstants.TRANSPORT_WS) ||
+                        transport.equals(TransactionCounterConstants.TRANSPORT_WSS))) {
+                    return 1;
+                }
             }
         }
         return 0;
     }
 
     public static int handleRequestOutFlow(MessageContext messageContext) {
+        if (messageContext == null) {
+            return 0;
+        }
         Object isThereAnAssociatedIncomingRequest = messageContext.getProperty(
                 TransactionCounterConstants.IS_THERE_ASSOCIATED_INCOMING_REQUEST);
 
@@ -57,6 +64,9 @@ public class TransactionCountingLogic {
     }
 
     public static int handleResponseOutFlow(MessageContext messageContext) {
+        if (messageContext == null) {
+            return 0;
+        }
         Object isThereAnAssociatedIncomingRequest = messageContext.getProperty(
                 TransactionCounterConstants.IS_THERE_ASSOCIATED_INCOMING_REQUEST);
 

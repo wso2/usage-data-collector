@@ -18,6 +18,8 @@
 
 package org.wso2.carbon.usage.data.collector.mi.transaction.publisher;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.osgi.service.component.annotations.Component;
@@ -91,16 +93,24 @@ public class TransactionPublisherImpl implements TransactionPublisher {
         
         @Override
         public String toJson() {
-            return "{\"dataType\":\"" + getDataType() + 
-                   "\",\"timestamp\":\"" + getTimestamp() + 
-                   "\",\"transactionCount\":" + transactionCount + 
-                   ",\"hourStartTime\":" + hourStartTime + 
-                   ",\"hourEndTime\":" + hourEndTime + 
-                   ",\"reportId\":\"" + reportId + "\"}";
+            try {
+                ObjectMapper mapper = new ObjectMapper();
+                java.util.Map<String, Object> map = new java.util.HashMap<>();
+                map.put("dataType", getDataType());
+                map.put("timestamp", getTimestamp());
+                map.put("transactionCount", transactionCount);
+                map.put("hourStartTime", hourStartTime);
+                map.put("hourEndTime", hourEndTime);
+                map.put("reportId", reportId);
+                return mapper.writeValueAsString(map);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to serialize TransactionUsageData to JSON", e);
+            }
         }
     }
     private volatile Publisher publisher;
     private volatile boolean reportingActive = false;
+    private org.wso2.carbon.usage.data.collector.mi.transaction.aggregator.TransactionAggregator aggregator = org.wso2.carbon.usage.data.collector.mi.transaction.aggregator.TransactionAggregator.getInstance();
     
     @Reference(
         cardinality = ReferenceCardinality.OPTIONAL,
@@ -121,13 +131,23 @@ public class TransactionPublisherImpl implements TransactionPublisher {
             LOG.warn("Cannot start reporting - Publisher service not available");
             return;
         }
-        
+        if (aggregator == null) {
+            LOG.error("Cannot start reporting - TransactionAggregator not available");
+            return;
+        }
+        aggregator.init(this);
         reportingActive = true;
+        LOG.info("Transaction reporting started and aggregator scheduled.");
     }
 
     @Override
     public void stopReporting() {
+        if (aggregator != null && aggregator.isEnabled()) {
+            aggregator.shutdown();
+            LOG.info("TransactionAggregator schedule stopped.");
+        }
         reportingActive = false;
+        LOG.info("Transaction reporting stopped.");
     }
 
     @Override
@@ -148,11 +168,15 @@ public class TransactionPublisherImpl implements TransactionPublisher {
         try {
             org.wso2.carbon.usage.data.collector.common.publisher.api.model.ApiRequest request = 
                 createApiRequestFromReport(report);
-            
-            publisher.callReceiverApi(request);
-            
-            return true;
-            
+            org.wso2.carbon.usage.data.collector.common.publisher.api.model.ApiResponse response = publisher.callReceiverApi(request);
+            if (response != null && response.isSuccess()) {
+                return true;
+            } else {
+                int status = response != null ? response.getStatusCode() : -1;
+                String body = response != null ? response.getResponseBody() : "null";
+                LOG.error("TransactionReportPublisher: Failed to publish transaction report. Status: " + status + ", Body: " + body);
+                return false;
+            }
         } catch (Exception e) {
             LOG.error("TransactionReportPublisher: Error while publishing transaction report via OSGi service", e);
             return false;
@@ -165,10 +189,25 @@ public class TransactionPublisherImpl implements TransactionPublisher {
             LOG.warn("Cannot report - Publisher service not available");
             return false;
         }
-
+        if (aggregator == null) {
+            LOG.error("Cannot report - TransactionAggregator not available");
+            return false;
+        }
         try {
-            return true;
-            
+            // Collect and publish immediately
+            long count = aggregator.getCurrentHourlyCount();
+            long hourStartTime = System.currentTimeMillis();
+            long hourEndTime = hourStartTime;
+            org.wso2.carbon.usage.data.collector.mi.transaction.record.TransactionReport report =
+                new org.wso2.carbon.usage.data.collector.mi.transaction.record.TransactionReport(
+                    count, hourStartTime, hourEndTime);
+            boolean success = publishTransactionReport(report);
+            if (success) {
+                LOG.info("Immediate transaction report published successfully.");
+            } else {
+                LOG.error("Failed to publish immediate transaction report.");
+            }
+            return success;
         } catch (Exception e) {
             LOG.error("Error while reporting transaction data", e);
             return false;

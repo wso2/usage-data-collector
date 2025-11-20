@@ -29,10 +29,10 @@ public class TransactionCountHandler extends AbstractExtendedSynapseHandler {
     private static final Log LOG = LogFactory.getLog(TransactionCountHandler.class);
     private TransactionAggregator transactionAggregator;
     private TransactionPublisher publisher;
-    private static boolean enabled = false;
+    private static volatile boolean enabled = false;
     private static TransactionCountHandler instance;
     
-    public static void registerTransactionPublisher(TransactionPublisher reporter) {
+    public static synchronized void registerTransactionPublisher(TransactionPublisher reporter) {
         if (instance == null || instance.transactionAggregator == null) {
             if (instance == null) {
                 instance = new TransactionCountHandler();
@@ -47,7 +47,7 @@ public class TransactionCountHandler extends AbstractExtendedSynapseHandler {
         }
     }
     
-    public static void unregisterTransactionPublisher(TransactionPublisher reporter) {
+    public static synchronized void unregisterTransactionPublisher(TransactionPublisher reporter) {
         if (instance != null && instance.publisher == reporter) {
             instance.publisher = null;
         }

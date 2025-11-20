@@ -37,8 +37,8 @@ public class DataSourceProvider {
     private static DataSourceProvider instance;
     private String dataSourceName;
     private boolean initialized = false;
-    private int retryCount = 0;
     private static final int MAX_RETRIES = 3;
+    private static final long RETRY_DELAY_MS = 200; // Optional: 200ms backoff
 
     private DataSourceProvider() {}
 
@@ -72,30 +72,34 @@ public class DataSourceProvider {
 
         // Lazy loading: try to get DataSource if not already loaded
         if (dataSource == null) {
-            synchronized (this) {
-                if (dataSource == null) {
-                    dataSource = lookupDataSource();
-
-                    if (dataSource == null) {
-                        retryCount++;
-
-                        if (retryCount >= MAX_RETRIES) {
-                            throw new SQLException("DataSource '" + dataSourceName +
-                                    "' not found after " + MAX_RETRIES + " attempts. " +
-                                    "Please ensure the DataSource is properly configured in deployment.toml");
-                        } else {
-                            throw new SQLException("DataSource '" + dataSourceName +
-                                    "' not available yet (attempt " + retryCount + "/" + MAX_RETRIES + ")");
+            int attempt = 0;
+            DataSource ds = null;
+            while (attempt < MAX_RETRIES) {
+                ds = lookupDataSource();
+                if (ds != null) {
+                    synchronized (this) {
+                        if (dataSource == null) {
+                            dataSource = ds;
                         }
-                    } else {
-                        log.info("DataSource '" + dataSourceName + "' successfully loaded on attempt " +
-                                (retryCount + 1));
-                        retryCount = 0; // Reset retry count on success
+                    }
+                    log.info("DataSource '" + dataSourceName + "' successfully loaded on attempt " + (attempt + 1));
+                    break;
+                }
+                attempt++;
+                if (attempt < MAX_RETRIES) {
+                    try {
+                        Thread.sleep(RETRY_DELAY_MS);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        break;
                     }
                 }
             }
+            if (dataSource == null) {
+                throw new SQLException("DataSource '" + dataSourceName + "' not found after " + MAX_RETRIES + " attempts. " +
+                        "Please ensure the DataSource is properly configured in deployment.toml");
+            }
         }
-
         return dataSource;
     }
 
@@ -148,6 +152,10 @@ public class DataSourceProvider {
 
         } catch (NoSuchMethodException e) {
             log.error("Method not found - API may have changed: " + e.getMessage(), e);
+        } catch (java.lang.reflect.InvocationTargetException invocationException) {
+            Throwable cause = invocationException.getCause();
+            String causeMsg = (cause != null) ? cause.getMessage() : "null";
+            log.error("InvocationTargetException while reflecting DataSource methods: " + causeMsg, cause);
         } catch (Exception e) {
             log.debug("Failed to lookup DataSource via OSGi: " + e.getMessage());
         }
@@ -173,14 +181,12 @@ public class DataSourceProvider {
      * Force a refresh of the DataSource (useful for testing or recovery)
      */
     public synchronized void refresh() {
-        log.info("Refreshing DataSource '" + dataSourceName + "'");
-        dataSource = null;
-        retryCount = 0;
+    log.info("Refreshing DataSource '" + dataSourceName + "'");
+    dataSource = null;
     }
 
-    public void close() {
+    public synchronized void close() {
         dataSource = null;
-        retryCount = 0;
         initialized = false;
     }
 }
