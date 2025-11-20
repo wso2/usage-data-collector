@@ -45,7 +45,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class UsageDataCollector {
 
-    private static final Log log = LogFactory.getLog(UsageDataCollector.class);
+    private static final Log LOG = LogFactory.getLog(UsageDataCollector.class);
     private static final int THREAD_POOL_SIZE = 10;
     private static final int PROCESSING_TIMEOUT_MINUTES = 15;
     public static final String SUPER_TENANT = "carbon.super";
@@ -86,8 +86,8 @@ public class UsageDataCollector {
             // Calculate root tenant count (all tenants including super tenant)
             int rootTenantCount = (tenants != null ? tenants.length : 0) + 1; // +1 for super tenant
             usage.setRootTenantCount(rootTenantCount);
-            if (log.isDebugEnabled()) {
-                log.debug("Root Tenant Count: " + rootTenantCount);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Root Tenant Count: " + rootTenantCount);
             }
             // Prepare list of all tenants
             List<String> allTenantDomains = new ArrayList<>();
@@ -112,12 +112,12 @@ public class UsageDataCollector {
                         totalB2BOrgs.addAndGet(stats.getB2bOrgCount());
                         totalUsers.addAndGet(stats.getUserCount());
 
-                        if (log.isDebugEnabled()) {
-                            log.debug(String.format("✓ Processed: %s | B2B Orgs: %d | Users: %d",
+                        if (LOG.isDebugEnabled()) {
+                            LOG.debug(String.format("✓ Processed: %s | B2B Orgs: %d | Users: %d",
                                     tenantDomain, stats.getB2bOrgCount(), stats.getUserCount()));
                         }
                     } catch (Exception e) {
-                        log.error("Error in processing tenant: " + tenantDomain, e);
+                        LOG.error("Error in processing tenant: " + tenantDomain, e);
                     } finally {
                         latch.countDown();
                     }
@@ -130,7 +130,9 @@ public class UsageDataCollector {
             usage.setTotalB2BOrganizations(totalB2BOrgs.get());
             usage.setTotalUsers(totalUsers.get());
         } catch (Exception e) {
-            log.error("Error calculating system statistics", e);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Error calculating system statistics", e);
+            }
         }
 
         return usage;
@@ -147,14 +149,16 @@ public class UsageDataCollector {
         int b2bOrgCount = orgCountCalculator.countB2BOrganizations(tenantDomain);
         stats.setB2bOrgCount(b2bOrgCount);
 
-        try{
+        try {
             // Use UserCountCalculator to count all users in the tenant
             int userCount = userCountCalculator.countAllUsersInTenant(tenantDomain);
             stats.setUserCount(userCount);
         } catch (Exception e) {
-            log.error("Error calculating user count for: " + tenantDomain, e);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Error calculating user count for: " + tenantDomain, e);
+            }
         }
-       return stats;
+        return stats;
     }
 
     /**
@@ -173,18 +177,18 @@ public class UsageDataCollector {
                 Thread.currentThread().interrupt();
             }
         }
-        log.debug("Usage Data Collector Service is shutdown.");
+        LOG.debug("Usage Data Collector Service is shutdown.");
     }
 
     // Todo: Need to remove this logic after implementing publisher.
     private void publish(SystemUsage report) {
 
         if (report == null) {
-            log.warn("No statistics report available");
+            LOG.warn("No statistics report available");
             return;
         }
 
-        log.info("\n" +
+        LOG.info("\n" +
                 "╔════════════════════════════════════════════════════════════╗\n" +
                 "║           USAGE STATISTICS REPORT                          ║\n" +
                 "╠════════════════════════════════════════════════════════════╣\n" +

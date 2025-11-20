@@ -26,23 +26,27 @@ import org.apache.commons.logging.LogFactory;
  */
 public class UsageDataCollectorTask implements Runnable {
 
-    private static final Log log = LogFactory.getLog(UsageDataCollectorTask.class);
+    private static final Log LOG = LogFactory.getLog(UsageDataCollectorTask.class);
 
-    private UsageDataCollector collector;
+    private final UsageDataCollector collector;
 
     public UsageDataCollectorTask(UsageDataCollector collector) {
+
         this.collector = collector;
     }
 
     @Override
     public void run() {
+
         try {
-            if(log.isDebugEnabled()) {
-                log.debug("Executing deployment data collection task");
+            if(LOG.isDebugEnabled()) {
+                LOG.debug("Executing usage data collection task");
             }
             collector.collectAndPublish();
         } catch (Exception e) {
-            log.error("Error executing deployment data collection task", e);
+            if(LOG.isDebugEnabled()) {
+                LOG.debug("Error executing usage data collection task", e);
+            }
             // Don't propagate exception - let scheduler continue
         }
     }

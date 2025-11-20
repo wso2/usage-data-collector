@@ -23,9 +23,6 @@ package org.wso2.carbon.usage.data.collector.identity.util;
  */
 public class UsageCollectorConstants {
 
-    public static final String SCIM_2_REMOVE_DUPLICATE_USERS_IN_USERS_RESPONSE =
-            "SCIM2.RemoveDuplicateUsersInUsersResponse";
+    public static final String USERNAME_CLAIM = "http://wso2.org/claims/username";
 
-    public static final String SCIM_ENABLE_CONSIDER_MAX_LIMIT_FOR_TOTAL_RESULT =
-            "SCIM2.ConsiderMaxLimitForTotalResult";
 }

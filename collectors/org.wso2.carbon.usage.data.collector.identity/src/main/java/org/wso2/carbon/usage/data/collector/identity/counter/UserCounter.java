@@ -38,11 +38,11 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- *  Counter to calculate total users in the system.
+ * Counter to calculate total users in the system.
  */
 public class UserCounter {
 
-    private static final Log log = LogFactory.getLog(UserCounter.class);
+    private static final Log LOG = LogFactory.getLog(UserCounter.class);
 
     // Configuration
     private static final int LDAP_PAGE_SIZE = 100;
@@ -65,8 +65,8 @@ public class UserCounter {
      */
     public int countAllUsersInTenant(String tenantDomain) throws Exception {
 
-        if (log.isDebugEnabled()) {
-            log.debug("Counting users in tenant: " + tenantDomain);
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Counting users in tenant: " + tenantDomain);
         }
         String rootOrgId = organizationManager.resolveOrganizationId(tenantDomain);
         if (rootOrgId == null) {
@@ -82,8 +82,8 @@ public class UserCounter {
             allOrgIds.addAll(childOrgIds);
         }
 
-        if (log.isDebugEnabled()) {
-            log.debug("Found " + allOrgIds.size() + " organizations in tenant: " + tenantDomain);
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Found " + allOrgIds.size() + " organizations in tenant: " + tenantDomain);
         }
 
         // Count users across all organizations
@@ -92,12 +92,12 @@ public class UserCounter {
             try {
                 int usersInOrg = countUsersInOrganization(orgId);
                 totalUsers += usersInOrg;
-                if (log.isDebugEnabled()) {
-                    log.debug(String.format("Organization %s has %d users", orgId, usersInOrg));
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug(String.format("Organization %s has %d users", orgId, usersInOrg));
                 }
             } catch (Exception e) {
-                if (log.isDebugEnabled()) {
-                    log.debug("Error counting users in organization: " + orgId, e);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Error counting users in organization: " + orgId, e);
                 }
             }
         }
@@ -141,8 +141,8 @@ public class UserCounter {
                 int count = isJDBCUserStore(userStoreManager, domain) ? countJDBCUsers(userStoreManager, domain) : 0;
                 totalUsers += count;
             } catch (Exception e) {
-                if (log.isDebugEnabled()) {
-                    log.debug("Error counting users in domain: " + domain, e);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Error counting users in domain: " + domain, e);
                 }
             }
         }
@@ -174,8 +174,8 @@ public class UserCounter {
         int offset = 0;
         int iteration = 0;
 
-        if (log.isDebugEnabled()) {
-            log.debug("Starting paginated count for LDAP domain: " + domain);
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Starting paginated count for LDAP domain: " + domain);
         }
         while (iteration < MAX_LDAP_ITERATIONS) {
             try {
@@ -206,21 +206,21 @@ public class UserCounter {
                 offset += LDAP_PAGE_SIZE;
                 iteration++;
             } catch (InterruptedException e) {
-                if (log.isDebugEnabled()) {
-                    log.debug("Thread interrupted during rate limiting sleep", e);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Thread interrupted during rate limiting sleep", e);
                 }
                 Thread.currentThread().interrupt();
                 break;
             } catch (Exception e) {
-                if (log.isDebugEnabled()) {
-                    log.error("Error at offset " + offset + " for domain " + domain, e);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Error at offset " + offset + " for domain " + domain, e);
                 }
                 break;
             }
         }
 
-        if (log.isDebugEnabled()) {
-            log.debug(String.format("LDAP domain '%s' total: %d users (%d iterations)",
+        if (LOG.isDebugEnabled()) {
+            LOG.debug(String.format("LDAP domain '%s' total: %d users (%d iterations)",
                     domain, totalCount, iteration + 1));
         }
         return totalCount;
@@ -280,16 +280,16 @@ public class UserCounter {
 
         // After take a longer break after certain request count.
         if (iteration % MAX_REQUESTS_PER_MINUTE == 0) {
-            log.debug(String.format("Rate limit checkpoint reached (%d requests). Sleeping for %dms",
+            LOG.debug(String.format("Rate limit checkpoint reached (%d requests). Sleeping for %dms",
                     iteration, SLEEP_AFTER_MAX_REQUESTS_MS));
             Thread.sleep(SLEEP_AFTER_MAX_REQUESTS_MS);
-            log.debug("Resumed after rate limit sleep");
+            LOG.debug("Resumed after rate limit sleep");
         }
 
         // After 5000 users enforce another sleep.
         if (iteration % 50 == 0) {
             Thread.sleep(SLEEP_AFTER_MAX_REQUESTS_MS);
-            log.debug(String.format("Progress: %d iterations completed", iteration));
+            LOG.debug(String.format("Progress: %d iterations completed", iteration));
         }
     }
 }

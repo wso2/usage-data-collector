@@ -25,11 +25,11 @@ import org.wso2.carbon.identity.organization.management.service.OrganizationMana
 import java.util.List;
 
 /**
- *  Counter to calculate total B2B organizations in the system.
+ * Counter to calculate total B2B organizations in the system.
  */
 public class OrganizationCounter {
 
-    private static final Log log = LogFactory.getLog(OrganizationCounter.class);
+    private static final Log LOG = LogFactory.getLog(OrganizationCounter.class);
 
     private final OrganizationManager organizationManager;
 
@@ -40,13 +40,14 @@ public class OrganizationCounter {
 
     /**
      * Count B2B organizations in a tenant (child organizations under root)
+     *
      * @param tenantDomain The tenant domain
      * @return Number of B2B organizations
      */
     public int countB2BOrganizations(String tenantDomain) {
 
         if (tenantDomain == null || tenantDomain.trim().isEmpty()) {
-            log.debug("Invalid tenant domain provided");
+            LOG.debug("Invalid tenant domain provided");
             return 0;
         }
 
@@ -54,19 +55,15 @@ public class OrganizationCounter {
             String rootOrgId = organizationManager.resolveOrganizationId(tenantDomain);
 
             if (rootOrgId == null) {
-                log.debug("No root organization found for tenant: " + tenantDomain);
                 return 0;
             }
 
             List<String> childOrgIds = organizationManager.getChildOrganizationsIds(rootOrgId, true);
-
             return (childOrgIds != null) ? childOrgIds.size() : 0;
-
-        } catch (NullPointerException e) {
-            log.debug("No root organization found for tenant: " + tenantDomain);
-            return 0;
         } catch (Exception e) {
-            log.error("Error calculating organization count for: " + tenantDomain, e);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Error calculating organization count for: " + tenantDomain, e);
+            }
             return 0;
         }
     }

@@ -47,10 +47,12 @@ public class UsageDataCollectorDataHolder {
     }
 
     public OrganizationManager getOrganizationManager() {
+
         return organizationManager;
     }
 
     public void setOrganizationManager(OrganizationManager organizationManager) {
+
         this.organizationManager = organizationManager;
     }
 

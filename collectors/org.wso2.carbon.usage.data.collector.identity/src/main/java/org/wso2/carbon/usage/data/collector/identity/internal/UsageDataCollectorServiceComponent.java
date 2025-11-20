@@ -38,18 +38,16 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
- *
  * Manages the lifecycle and scheduling of usage data collection.
  */
 @Component(
-    name = "org.wso2.carbon.deployment.data.collector",
-    immediate = true
+        name = "org.wso2.carbon.usage.data.collector.identity",
+        immediate = true
 )
 public class UsageDataCollectorServiceComponent {
 
-    private static final Log log = LogFactory.getLog(UsageDataCollectorServiceComponent.class);
+    private static final Log LOG = LogFactory.getLog(UsageDataCollectorServiceComponent.class);
 
-    // Configuration constants
     private static final long INITIAL_DELAY_SECONDS = 30;
     private static final long INTERVAL_SECONDS = 60;
     private static final long SHUTDOWN_TIMEOUT_SECONDS = 10;
@@ -60,6 +58,7 @@ public class UsageDataCollectorServiceComponent {
 
     @Activate
     protected void activate(ComponentContext context) {
+
         try {
 
             collectorService = new UsageDataCollector();
@@ -77,18 +76,21 @@ public class UsageDataCollectorServiceComponent {
                     TimeUnit.SECONDS
             );
 
-            log.debug("UsageDataCollectorServiceComponent activated successfully");
+            LOG.debug("UsageDataCollectorServiceComponent activated successfully");
 
         } catch (Exception e) {
-            log.error("Error activating UsageDataCollectorServiceComponent", e);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Error activating UsageDataCollectorServiceComponent", e);
+            }
             cleanup();
         }
     }
 
     @Deactivate
     protected void deactivate(ComponentContext context) {
+
         cleanup();
-        log.debug("UsageDataCollectorServiceComponent deactivated successfully");
+        LOG.debug("UsageDataCollectorServiceComponent deactivated successfully");
     }
 
     private void cleanup() {
@@ -113,7 +115,9 @@ public class UsageDataCollectorServiceComponent {
             try {
                 collectorService.shutdown();
             } catch (Exception e) {
-                log.error("Error shutting down collector service", e);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Error shutting down collector service", e);
+                }
             }
         }
     }
@@ -141,10 +145,12 @@ public class UsageDataCollectorServiceComponent {
             unbind = "unsetOrganizationManager"
     )
     protected void setOrganizationManager(OrganizationManager organizationManager) {
+
         UsageDataCollectorDataHolder.getInstance().setOrganizationManager(organizationManager);
     }
 
     protected void unsetOrganizationManager(OrganizationManager organizationManager) {
+
         UsageDataCollectorDataHolder.getInstance().setOrganizationManager(null);
     }
 }
