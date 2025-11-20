@@ -35,7 +35,7 @@ public class TransactionAggregator {
     }
 
     private static final Log LOG = LogFactory.getLog(TransactionAggregator.class);
-    private static TransactionAggregator instance = null;
+    private static volatile TransactionAggregator instance = null;
     
     private final AtomicLong hourlyTransactionCount = new AtomicLong(0);
     private TransactionPublisher publisher;
@@ -47,7 +47,11 @@ public class TransactionAggregator {
 
     public static TransactionAggregator getInstance() {
         if (instance == null) {
-            instance = new TransactionAggregator();
+            synchronized (TransactionAggregator.class) {
+                if (instance == null) {
+                    instance = new TransactionAggregator();
+                }
+            }
         }
         return instance;
     }
@@ -86,16 +90,19 @@ public class TransactionAggregator {
         this.currentHourStartTime = System.currentTimeMillis();
         this.scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
 
-        long interval = 30000L;
-
+        long interval = 60 * 60 * 1000L;
+        try {
         scheduledExecutorService.scheduleAtFixedRate(
                 this::publishAndReset,
                 interval,
                 interval,
                 TimeUnit.MILLISECONDS
         );
-
         this.enabled = true;
+        } catch (Exception e) {
+            LOG.error("TransactionAggregator: Failed to schedule periodic task", e);
+            this.enabled = false;
+        }
     }
 
 

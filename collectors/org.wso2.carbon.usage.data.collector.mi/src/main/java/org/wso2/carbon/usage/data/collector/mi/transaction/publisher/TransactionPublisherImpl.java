@@ -19,17 +19,16 @@
 package org.wso2.carbon.usage.data.collector.mi.transaction.publisher;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Deactivate;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ReferenceCardinality;
 import org.osgi.service.component.annotations.ReferencePolicy;
 import org.wso2.carbon.usage.data.collector.common.publisher.api.Publisher;
 import org.wso2.carbon.usage.data.collector.mi.transaction.record.TransactionReport;
-import org.osgi.service.component.annotations.Activate;
-import org.osgi.service.component.annotations.Deactivate;
 
 /**
  * Transaction Report Publisher implementation.
@@ -40,19 +39,25 @@ import org.osgi.service.component.annotations.Deactivate;
     immediate = true
 )
 public class TransactionPublisherImpl implements TransactionPublisher {
-    
+
     private static final Log LOG = LogFactory.getLog(TransactionPublisherImpl.class);
-    
+
+    private volatile Publisher publisher;
+    private volatile boolean reportingActive = false;
+    private org.wso2.carbon.usage.data.collector.mi.transaction.aggregator.TransactionAggregator aggregator;
+
     @Activate
     protected void activate() {
-    org.wso2.carbon.usage.data.collector.mi.transaction.counter.TransactionCountHandler.registerTransactionPublisher(this);
+        org.wso2.carbon.usage.data.collector.mi.transaction.counter.TransactionCountHandler.registerTransactionPublisher(
+                this);
     }
-    
-    @Deactivate 
+
+    @Deactivate
     protected void deactivate() {
-    org.wso2.carbon.usage.data.collector.mi.transaction.counter.TransactionCountHandler.unregisterTransactionPublisher(this);
+        org.wso2.carbon.usage.data.collector.mi.transaction.counter.TransactionCountHandler.unregisterTransactionPublisher(
+                this);
     }
-    
+
     private org.wso2.carbon.usage.data.collector.common.publisher.api.model.ApiRequest createApiRequestFromReport(TransactionReport report) {
         TransactionUsageData usageData = new TransactionUsageData();
         usageData.setDataType("TRANSACTION_DATA");
@@ -61,40 +66,39 @@ public class TransactionPublisherImpl implements TransactionPublisher {
         usageData.setHourStartTime(report.getHourStartTime());
         usageData.setHourEndTime(report.getHourEndTime());
         usageData.setReportId(report.getId());
-        
+
         return new org.wso2.carbon.usage.data.collector.common.publisher.api.model.ApiRequest.Builder()
-            .withEndpoint("transaction-reports")
-            .withData(usageData)
-            .build();
+                .withEndpoint("transaction-reports")
+                .withData(usageData)
+                .build();
     }
-    
 
     private static class TransactionUsageData extends org.wso2.carbon.usage.data.collector.common.publisher.api.model.UsageData {
+        private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
         private long transactionCount;
         private long hourStartTime;
         private long hourEndTime;
         private String reportId;
-        
+
         public void setTransactionCount(long transactionCount) {
             this.transactionCount = transactionCount;
         }
-        
+
         public void setHourStartTime(long hourStartTime) {
             this.hourStartTime = hourStartTime;
         }
-        
+
         public void setHourEndTime(long hourEndTime) {
             this.hourEndTime = hourEndTime;
         }
-        
+
         public void setReportId(String reportId) {
             this.reportId = reportId;
         }
-        
+
         @Override
         public String toJson() {
             try {
-                ObjectMapper mapper = new ObjectMapper();
                 java.util.Map<String, Object> map = new java.util.HashMap<>();
                 map.put("dataType", getDataType());
                 map.put("timestamp", getTimestamp());
@@ -102,35 +106,33 @@ public class TransactionPublisherImpl implements TransactionPublisher {
                 map.put("hourStartTime", hourStartTime);
                 map.put("hourEndTime", hourEndTime);
                 map.put("reportId", reportId);
-                return mapper.writeValueAsString(map);
+                return OBJECT_MAPPER.writeValueAsString(map);
             } catch (Exception e) {
                 throw new RuntimeException("Failed to serialize TransactionUsageData to JSON", e);
             }
         }
     }
-    private volatile Publisher publisher;
-    private volatile boolean reportingActive = false;
-    private org.wso2.carbon.usage.data.collector.mi.transaction.aggregator.TransactionAggregator aggregator = org.wso2.carbon.usage.data.collector.mi.transaction.aggregator.TransactionAggregator.getInstance();
-    
+
     @Reference(
-        cardinality = ReferenceCardinality.OPTIONAL,
-        policy = ReferencePolicy.DYNAMIC,
-        unbind = "unsetPublisher"
+            cardinality = ReferenceCardinality.OPTIONAL,
+            policy = ReferencePolicy.DYNAMIC,
+            unbind = "unsetPublisher"
     )
     protected void setPublisher(Publisher publisher) {
         this.publisher = publisher;
     }
-    
+
     protected void unsetPublisher(Publisher publisher) {
         this.publisher = null;
     }
-    
+
     @Override
     public void startReporting() {
         if (publisher == null) {
             LOG.warn("Cannot start reporting - Publisher service not available");
             return;
         }
+        aggregator = org.wso2.carbon.usage.data.collector.mi.transaction.aggregator.TransactionAggregator.getInstance();
         if (aggregator == null) {
             LOG.error("Cannot start reporting - TransactionAggregator not available");
             return;
@@ -156,7 +158,11 @@ public class TransactionPublisherImpl implements TransactionPublisher {
     }
 
     private boolean publishTransactionReport(TransactionReport report) {
-        if (publisher == null) {
+        Publisher currentPublisher;
+        synchronized (this) {
+            currentPublisher = this.publisher;
+        }
+        if (currentPublisher == null) {
             LOG.warn("TransactionReportPublisher: Cannot publish - Publisher service not available via OSGi");
             return false;
         }
@@ -164,7 +170,8 @@ public class TransactionPublisherImpl implements TransactionPublisher {
         try {
             org.wso2.carbon.usage.data.collector.common.publisher.api.model.ApiRequest request = 
                 createApiRequestFromReport(report);
-            org.wso2.carbon.usage.data.collector.common.publisher.api.model.ApiResponse response = publisher.callReceiverApi(request);
+            org.wso2.carbon.usage.data.collector.common.publisher.api.model.ApiResponse response =
+                    currentPublisher.callReceiverApi(request);
             if (response != null && response.isSuccess()) {
                 return true;
             } else {

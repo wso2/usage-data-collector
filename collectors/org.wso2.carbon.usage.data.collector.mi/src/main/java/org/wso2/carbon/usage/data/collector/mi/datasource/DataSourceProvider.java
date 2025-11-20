@@ -24,8 +24,9 @@ import org.osgi.framework.BundleContext;
 import org.osgi.framework.FrameworkUtil;
 import org.osgi.framework.ServiceReference;
 
-import javax.sql.DataSource;
 import java.sql.SQLException;
+
+import javax.sql.DataSource;
 
 /**
  * DataSource provider that retrieves DataSource via OSGi service lookup.
@@ -34,7 +35,7 @@ public class DataSourceProvider {
 
     private static final Log log = LogFactory.getLog(DataSourceProvider.class);
     private DataSource dataSource;
-    private static DataSourceProvider instance;
+    private static volatile DataSourceProvider instance;
     private String dataSourceName;
     private boolean initialized = false;
     private static final int MAX_RETRIES = 3;
@@ -42,9 +43,13 @@ public class DataSourceProvider {
 
     private DataSourceProvider() {}
 
-    public static synchronized DataSourceProvider getInstance() {
+    public static DataSourceProvider getInstance() {
         if (instance == null) {
-            instance = new DataSourceProvider();
+            synchronized (DataSourceProvider.class) {
+                if (instance == null) {
+                    instance = new DataSourceProvider();
+                }
+            }
         }
         return instance;
     }
@@ -80,10 +85,14 @@ public class DataSourceProvider {
                     synchronized (this) {
                         if (dataSource == null) {
                             dataSource = ds;
+                            log.info("DataSource '" + dataSourceName + "' successfully loaded on attempt " +
+                                    (attempt + 1));
                         }
                     }
-                    log.info("DataSource '" + dataSourceName + "' successfully loaded on attempt " + (attempt + 1));
-                    break;
+                    // If dataSource was set by this thread, break; otherwise, continue retrying
+                    if (dataSource != null) {
+                        break;
+                    }
                 }
                 attempt++;
                 if (attempt < MAX_RETRIES) {

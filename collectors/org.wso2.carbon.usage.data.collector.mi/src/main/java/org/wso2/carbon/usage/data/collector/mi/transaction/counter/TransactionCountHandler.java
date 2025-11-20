@@ -29,28 +29,23 @@ public class TransactionCountHandler extends AbstractExtendedSynapseHandler {
     private static final Log LOG = LogFactory.getLog(TransactionCountHandler.class);
     private TransactionAggregator transactionAggregator;
     private TransactionPublisher publisher;
-    private static volatile boolean enabled = false;
+    private volatile boolean enabled = false;
     private static TransactionCountHandler instance;
     
     public static synchronized void registerTransactionPublisher(TransactionPublisher reporter) {
-        if (instance == null || instance.transactionAggregator == null) {
-            if (instance == null) {
-                instance = new TransactionCountHandler();
-            }
-            instance.publisher = reporter;
+        if (instance == null) {
+            instance = new TransactionCountHandler();
+        }
+        instance.publisher = reporter;
+        if (instance.transactionAggregator == null) {
             instance.transactionAggregator = TransactionAggregator.getInstance();
-            // Only initialize if not already enabled
-            if (!instance.transactionAggregator.isEnabled()) {
-                instance.transactionAggregator.init(reporter);
-            }
-            enabled = true;
-        } else {
-            instance.publisher = reporter;
-            // Only initialize if not already enabled
+        }
+        synchronized (instance.transactionAggregator) {
             if (!instance.transactionAggregator.isEnabled()) {
                 instance.transactionAggregator.init(reporter);
             }
         }
+        instance.enabled = true;
     }
     
     public static synchronized void unregisterTransactionPublisher(TransactionPublisher reporter) {
@@ -66,7 +61,7 @@ public class TransactionCountHandler extends AbstractExtendedSynapseHandler {
             }
         } catch (Exception e) {
             LOG.error("TransactionCountHandler: Error in constructor", e);
-            enabled = false;
+            this.enabled = false;
         }
     }
 
@@ -78,12 +73,12 @@ public class TransactionCountHandler extends AbstractExtendedSynapseHandler {
 
     @Override
     public boolean handleRequestInFlow(MessageContext messageContext) {
-        if(!enabled) {
+        if (instance == null || !instance.enabled) {
             return true;
         }
         int tCount = TransactionCountingLogic.handleRequestInFlow(messageContext);
         if(tCount > 0) {
-            if(instance != null && instance.transactionAggregator != null && instance.transactionAggregator.isEnabled()) {
+            if (instance.transactionAggregator != null && instance.transactionAggregator.isEnabled()) {
                 instance.transactionAggregator.addTransactions(tCount);
             }
         }
@@ -105,12 +100,12 @@ public class TransactionCountHandler extends AbstractExtendedSynapseHandler {
 
     @Override
     public boolean handleRequestOutFlow(MessageContext messageContext) {
-        if(!enabled) {
+        if (instance == null || !instance.enabled) {
             return true;
         }
         int tCount = TransactionCountingLogic.handleRequestOutFlow(messageContext);
         if(tCount > 0) {
-            if(instance != null && instance.transactionAggregator != null && instance.transactionAggregator.isEnabled()) {
+            if (instance.transactionAggregator != null && instance.transactionAggregator.isEnabled()) {
                 instance.transactionAggregator.addTransactions(tCount);
             }
         }
@@ -119,12 +114,12 @@ public class TransactionCountHandler extends AbstractExtendedSynapseHandler {
 
     @Override
     public boolean handleResponseInFlow(MessageContext messageContext) {
-        if(!enabled) {
+        if (instance == null || !instance.enabled) {
             return true;
         }
         int tCount = TransactionCountingLogic.handleResponseInFlow(messageContext);
         if(tCount > 0) {
-            if(instance != null && instance.transactionAggregator != null && instance.transactionAggregator.isEnabled()) {
+            if (instance.transactionAggregator != null && instance.transactionAggregator.isEnabled()) {
                 instance.transactionAggregator.addTransactions(tCount);
             }
         }
@@ -133,12 +128,12 @@ public class TransactionCountHandler extends AbstractExtendedSynapseHandler {
 
     @Override
     public boolean handleResponseOutFlow(MessageContext messageContext) {
-        if(!enabled) {
+        if (instance == null || !instance.enabled) {
             return true;
         }
         int tCount = TransactionCountingLogic.handleResponseOutFlow(messageContext);
         if(tCount > 0) {
-            if(instance != null && instance.transactionAggregator != null && instance.transactionAggregator.isEnabled()) {
+            if (instance.transactionAggregator != null && instance.transactionAggregator.isEnabled()) {
                 instance.transactionAggregator.addTransactions(tCount);
             }
         }

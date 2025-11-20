@@ -18,56 +18,57 @@
 
 package org.wso2.carbon.usage.data.collector.mi.transaction.record;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.UUID;
 
 public class TransactionReport {
-    
+    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+            .withZone(ZoneId.systemDefault());
+
     private final String id;
     private final long totalCount;
     private final long hourStartTime;
     private final long hourEndTime;
     private final String recordedTime;
-    
+
     public TransactionReport(long totalCount, long hourStartTime, long hourEndTime) {
         this.id = UUID.randomUUID().toString();
         this.totalCount = totalCount;
         this.hourStartTime = hourStartTime;
         this.hourEndTime = hourEndTime;
-        this.recordedTime = new Date(hourEndTime).toString();
+        this.recordedTime = FORMATTER.format(Instant.ofEpochMilli(hourEndTime));
     }
-    
+
     public String getId() {
         return id;
     }
-    
+
     public long getTotalCount() {
         return totalCount;
     }
-    
+
     public long getHourStartTime() {
         return hourStartTime;
     }
-    
+
     public long getHourEndTime() {
         return hourEndTime;
     }
-    
+
     public String getRecordedTime() {
         return recordedTime;
     }
-    
+
     public String getFormattedStartTime() {
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-        return sdf.format(new Date(hourStartTime));
+        return FORMATTER.format(Instant.ofEpochMilli(hourStartTime));
     }
-    
+
     public String getFormattedEndTime() {
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-        return sdf.format(new Date(hourEndTime));
+        return FORMATTER.format(Instant.ofEpochMilli(hourEndTime));
     }
-    
+
     @Override
     public String toString() {
         return "TransactionReport{" +
