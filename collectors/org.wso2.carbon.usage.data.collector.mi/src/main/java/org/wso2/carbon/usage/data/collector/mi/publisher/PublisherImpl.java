@@ -57,20 +57,21 @@ public class PublisherImpl implements Publisher {
     @Deactivate 
     protected void deactivate() {}
     
-    private static final String DATASOURCE_NAME = "jdbc/WSO2_COORDINATION_DB";
-    private static final String SERVER_BASE_URL = "http://localhost:8081";
-    private static final String RECEIVER_ENDPOINT = SERVER_BASE_URL + "/api/receiver";
-    private static final String WSO2_ENDPOINT = SERVER_BASE_URL + "/api/wso2";
+    private static final String DATASOURCE_NAME = "WSO2_CONSUMPTION_TRACKING_DB";
+    private static final String RECEIVER_ENDPOINT = "http://localhost:8081/api/receiver";
+    private static final String WSO2_ENDPOINT = "https://api.wso2.com/usage-data";
 
     @Override
     public DataSource getDataSource() throws PublisherException {
-        try {
-            DataSourceProvider provider = DataSourceProvider.getInstance();
-            provider.initialize();
-            return provider.getDataSource();
-        } catch (SQLException e) {
-            String errorMsg = "Failed to get datasource: " + DATASOURCE_NAME;
-            log.error(errorMsg, e);
+    try {
+        DataSourceProvider provider = DataSourceProvider.getInstance();
+        if (!provider.isInitialized()) {
+            provider.initialize(DATASOURCE_NAME);
+        }
+        return provider.getDataSource();
+    } catch (SQLException e) {
+        String errorMsg = "Failed to get datasource: " + DATASOURCE_NAME;
+        log.error(errorMsg, e);
             throw new PublisherException(errorMsg, e);
         }
     }

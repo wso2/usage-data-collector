@@ -18,14 +18,10 @@
 
 package org.wso2.carbon.usage.data.collector.mi.transaction.counter;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.synapse.MessageContext;
 import org.apache.synapse.core.axis2.Axis2MessageContext;
 
 public class TransactionCountingLogic {
-
-    private static final Log LOG = LogFactory.getLog(TransactionCountingLogic.class);
 
     public static int handleRequestInFlow(MessageContext messageContext) {
         if (messageContext != null) {
