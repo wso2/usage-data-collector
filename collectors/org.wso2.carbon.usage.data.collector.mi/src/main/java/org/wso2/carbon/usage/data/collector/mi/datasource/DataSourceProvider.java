@@ -104,6 +104,7 @@ public class DataSourceProvider {
                     }
                 }
             }
+
             if (dataSource == null) {
                 throw new SQLException("DataSource '" + dataSourceName + "' not found after " + MAX_RETRIES + " attempts. " +
                         "Please ensure the DataSource is properly configured in deployment.toml");
@@ -114,8 +115,12 @@ public class DataSourceProvider {
 
     private DataSource lookupDataSource() {
         try {
-            BundleContext bundleContext = FrameworkUtil.getBundle(this.getClass()).getBundleContext();
-
+            org.osgi.framework.Bundle bundle = FrameworkUtil.getBundle(this.getClass());
+            if (bundle == null) {
+                log.debug("Bundle is null - OSGi environment not ready or class not loaded as OSGi bundle");
+                return null;
+            }
+            BundleContext bundleContext = bundle.getBundleContext();
             if (bundleContext == null) {
                 log.debug("BundleContext is null - OSGi environment not ready");
                 return null;

@@ -131,15 +131,13 @@
                 <configuration>
                     <source>8</source>
                     <target>8</target>
-                    <!-- Skip compilation by default for OSGi bundle - classes will be available at WSO2 MI runtime -->
-                    <skipMain>${skip.compilation}</skipMain>
                 </configuration>
             </plugin>
         </plugins>
     </build>
     <properties>
         <synapse.version>[4.0.0,5.0.0)</synapse.version>
-        <jackson.version>2.15.2</jackson.version>
+        <jackson.version>2.16.0</jackson.version>
         <httpcore.version>4.4.16.wso2v1</httpcore.version>
         <httpcomponent.version>4.2.5.wso2v1</httpcomponent.version>
         <osgi.core.version>6.0.0</osgi.core.version>
