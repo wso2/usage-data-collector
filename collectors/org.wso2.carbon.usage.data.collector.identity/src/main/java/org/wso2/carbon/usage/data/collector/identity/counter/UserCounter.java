@@ -22,6 +22,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.wso2.carbon.context.PrivilegedCarbonContext;
 import org.wso2.carbon.identity.organization.management.service.OrganizationManager;
+import org.wso2.carbon.usage.data.collector.identity.util.UsageCollectorConstants;
 import org.wso2.carbon.user.core.UserStoreManager;
 import org.wso2.carbon.user.core.common.AbstractUserStoreManager;
 import org.wso2.carbon.user.core.jdbc.JDBCUserStoreManager;
@@ -44,12 +45,9 @@ public class UserCounter {
     private static final Log log = LogFactory.getLog(UserCounter.class);
 
     // Configuration
-    private static final String USERNAME_CLAIM = "http://wso2.org/claims/username";
     private static final int LDAP_PAGE_SIZE = 100;
     private static final int MAX_LDAP_ITERATIONS = 1000;
     private static final long SLEEP_BETWEEN_REQUESTS_MS = 100; // 100ms
-    private static final long SLEEP_AFTER_BATCH_MS = 6_000;
-    private static final int BATCH_SIZE = 10;
     private static final long SLEEP_AFTER_MAX_REQUESTS_MS = 5_000; // 5 seconds
     private static final int MAX_REQUESTS_PER_MINUTE = 2;
 
@@ -72,7 +70,6 @@ public class UserCounter {
         }
         String rootOrgId = organizationManager.resolveOrganizationId(tenantDomain);
         if (rootOrgId == null) {
-            log.debug("No root organization found for tenant: " + tenantDomain);
             return 0;
         }
 
@@ -85,7 +82,9 @@ public class UserCounter {
             allOrgIds.addAll(childOrgIds);
         }
 
-        log.debug("Found " + allOrgIds.size() + " organizations in tenant: " + tenantDomain);
+        if (log.isDebugEnabled()) {
+            log.debug("Found " + allOrgIds.size() + " organizations in tenant: " + tenantDomain);
+        }
 
         // Count users across all organizations
         int totalUsers = 0;
@@ -93,9 +92,13 @@ public class UserCounter {
             try {
                 int usersInOrg = countUsersInOrganization(orgId);
                 totalUsers += usersInOrg;
-                log.debug(String.format("Organization %s has %d users", orgId, usersInOrg));
+                if (log.isDebugEnabled()) {
+                    log.debug(String.format("Organization %s has %d users", orgId, usersInOrg));
+                }
             } catch (Exception e) {
-                log.error("Error counting users in organization: " + orgId, e);
+                if (log.isDebugEnabled()) {
+                    log.debug("Error counting users in organization: " + orgId, e);
+                }
             }
         }
         return totalUsers;
@@ -134,13 +137,13 @@ public class UserCounter {
 
         for (String domain : domains) {
             try {
-                int count = isJDBCUserStore(userStoreManager, domain)
-                        ? countJDBCUsers(userStoreManager, domain)
-                        : countLDAPUsers(userStoreManager, domain);
-
+                // Todo: Currently LDAP Users are skipped and need to enable this properly.
+                int count = isJDBCUserStore(userStoreManager, domain) ? countJDBCUsers(userStoreManager, domain) : 0;
                 totalUsers += count;
             } catch (Exception e) {
-                log.error("Error counting users in domain: " + domain, e);
+                if (log.isDebugEnabled()) {
+                    log.debug("Error counting users in domain: " + domain, e);
+                }
             }
         }
 
@@ -156,7 +159,7 @@ public class UserCounter {
                 (AbstractUserStoreManager) userStoreManager.getSecondaryUserStoreManager(domain);
 
         if (abstractUSM instanceof JDBCUserStoreManager) {
-            return (int) abstractUSM.countUsersWithClaims(USERNAME_CLAIM, "*");
+            return (int) abstractUSM.countUsersWithClaims(UsageCollectorConstants.USERNAME_CLAIM, "*");
         }
         return 0;
     }
@@ -176,16 +179,6 @@ public class UserCounter {
         }
         while (iteration < MAX_LDAP_ITERATIONS) {
             try {
-                // Rate limiting
-//                if (iteration > 0) {
-//                    Thread.sleep(SLEEP_BETWEEN_REQUESTS_MS);
-//                    if (iteration % BATCH_SIZE == 0) {
-//                        log.info(String.format("Processed %d batches. Sleeping %dms...",
-//                                iteration, SLEEP_AFTER_BATCH_MS));
-//                        Thread.sleep(SLEEP_AFTER_BATCH_MS);
-//                    }
-//                }
-
                 // Apply rate limiting before request
                 if (iteration > 0) {
                     applyRateLimiting(iteration);
@@ -213,11 +206,15 @@ public class UserCounter {
                 offset += LDAP_PAGE_SIZE;
                 iteration++;
             } catch (InterruptedException e) {
-                log.warn("Thread interrupted during rate limiting sleep", e);
+                if (log.isDebugEnabled()) {
+                    log.debug("Thread interrupted during rate limiting sleep", e);
+                }
                 Thread.currentThread().interrupt();
                 break;
             } catch (Exception e) {
-                log.error("Error at offset " + offset + " for domain " + domain, e);
+                if (log.isDebugEnabled()) {
+                    log.error("Error at offset " + offset + " for domain " + domain, e);
+                }
                 break;
             }
         }
