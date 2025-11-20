@@ -151,12 +151,8 @@ public class TransactionPublisherImpl implements TransactionPublisher {
     }
 
     @Override
-    public boolean publishTransaction(Object report) {
-        if (report instanceof TransactionReport) {
-            return publishTransactionReport((TransactionReport) report);
-        }
-        LOG.warn("Invalid report type provided: " + (report != null ? report.getClass().getName() : "null"));
-        return false;
+    public boolean publishTransaction(TransactionReport report) {
+        return publishTransactionReport(report);
     }
 
     private boolean publishTransactionReport(TransactionReport report) {

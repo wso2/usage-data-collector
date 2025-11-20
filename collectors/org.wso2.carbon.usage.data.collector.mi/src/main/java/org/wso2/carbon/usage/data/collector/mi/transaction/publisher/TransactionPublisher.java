@@ -18,6 +18,8 @@
 
 package org.wso2.carbon.usage.data.collector.mi.transaction.publisher;
 
+import org.wso2.carbon.usage.data.collector.mi.transaction.record.TransactionReport;
+
 /**
  * Interface for MI transaction reporting service.
  * This service collects and reports transaction information periodically
@@ -61,5 +63,5 @@ public interface TransactionPublisher {
      * @param report The transaction report to publish
      * @return true if publishing was successful, false otherwise
      */
-    boolean publishTransaction(Object report);
+    boolean publishTransaction(TransactionReport report);
 }
