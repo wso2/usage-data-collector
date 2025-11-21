@@ -20,6 +20,7 @@ package org.wso2.carbon.usage.data.collector.identity.internal;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.osgi.framework.BundleContext;
 import org.osgi.service.component.ComponentContext;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
@@ -27,10 +28,13 @@ import org.osgi.service.component.annotations.Deactivate;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ReferenceCardinality;
 import org.osgi.service.component.annotations.ReferencePolicy;
+import org.wso2.carbon.core.clustering.api.CoordinatedActivity;
 import org.wso2.carbon.identity.organization.management.service.OrganizationManager;
 import org.wso2.carbon.usage.data.collector.identity.UsageDataCollector;
 import org.wso2.carbon.usage.data.collector.identity.UsageDataCollectorTask;
+import org.wso2.carbon.usage.data.collector.identity.util.ClusteringUtil;
 import org.wso2.carbon.user.core.service.RealmService;
+import org.wso2.carbon.utils.ConfigurationContextService;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -55,26 +59,26 @@ public class UsageDataCollectorServiceComponent {
     private UsageDataCollector collectorService;
     private ScheduledExecutorService scheduler;
     private ScheduledFuture<?> scheduledTask;
+    private BundleContext bundleContext;
 
     @Activate
     protected void activate(ComponentContext context) {
 
         try {
 
+            this.bundleContext = context.getBundleContext();
+
             collectorService = new UsageDataCollector();
 
-            scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-                Thread thread = new Thread(r, "IS-UsageDataCollector-Thread");
-                thread.setDaemon(true);
-                return thread;
-            });
+            boolean isClusteringEnabled = ClusteringUtil.isClusteringEnabled();
 
-            scheduledTask = scheduler.scheduleAtFixedRate(
-                    new UsageDataCollectorTask(collectorService),
-                    INITIAL_DELAY_SECONDS,
-                    INTERVAL_SECONDS,
-                    TimeUnit.SECONDS
-            );
+            if (isClusteringEnabled) {
+                LOG.debug("Clustering detected. Co-ordinator listener is enabled for usage data collectors.");
+                registerDataCollectionAsCoordinatorActivity();
+            } else {
+                LOG.debug("Standalone setup detected. Usage data collectors starts immediately.");
+                runUsageCollectionTask();
+            }
 
             LOG.debug("UsageDataCollectorServiceComponent activated successfully");
 
@@ -152,5 +156,68 @@ public class UsageDataCollectorServiceComponent {
     protected void unsetOrganizationManager(OrganizationManager organizationManager) {
 
         UsageDataCollectorDataHolder.getInstance().setOrganizationManager(null);
+    }
+
+    @Reference(
+            name = "configuration.context.service",
+            service = ConfigurationContextService.class,
+            cardinality = ReferenceCardinality.MANDATORY,
+            policy = ReferencePolicy.DYNAMIC,
+            unbind = "unsetConfigurationContextService"
+    )
+    protected void setConfigurationContextService(ConfigurationContextService configContextService) {
+        UsageDataCollectorDataHolder.getInstance().setConfigurationContextService(configContextService);
+    }
+
+    protected void unsetConfigurationContextService(ConfigurationContextService configContextService) {
+        UsageDataCollectorDataHolder.getInstance().setConfigurationContextService(null);
+    }
+
+    /**
+     * Register coordinator activity for usage data collection.
+     */
+    private void registerDataCollectionAsCoordinatorActivity() {
+
+        try {
+            CoordinatedActivity coordinatorListener = new CoordinatedActivity() {
+                @Override
+                public void execute() {
+                    LOG.debug("This node is the coordinator and will run the collectors.");
+                    runUsageCollectionTask();
+                }
+            };
+
+            // Register the coordinated activity
+            bundleContext.registerService(
+                    CoordinatedActivity.class.getName(),
+                    coordinatorListener,
+                    null
+            );
+
+            // Run the usage task for the first time if this node is co-ordinator.
+            if (ClusteringUtil.isCoordinator()) {
+                runUsageCollectionTask();
+            }
+        } catch (Exception e) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Error registering coordinator activity", e);
+            }
+        }
+    }
+
+    private void runUsageCollectionTask() {
+
+        scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread thread = new Thread(r, "IS-UsageDataCollector-Thread");
+            thread.setDaemon(true);
+            return thread;
+        });
+
+        scheduledTask = scheduler.scheduleAtFixedRate(
+                new UsageDataCollectorTask(collectorService),
+                INITIAL_DELAY_SECONDS,
+                INTERVAL_SECONDS,
+                TimeUnit.SECONDS
+        );
     }
 }

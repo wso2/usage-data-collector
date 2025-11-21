@@ -23,6 +23,8 @@ package org.wso2.carbon.usage.data.collector.identity.util;
  */
 public class UsageCollectorConstants {
 
+    private UsageCollectorConstants() {}
+
     public static final String USERNAME_CLAIM = "http://wso2.org/claims/username";
 
 }

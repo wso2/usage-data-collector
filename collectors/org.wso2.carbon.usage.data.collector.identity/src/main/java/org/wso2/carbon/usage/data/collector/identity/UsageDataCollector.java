@@ -23,21 +23,18 @@ import org.apache.commons.logging.LogFactory;
 import org.wso2.carbon.identity.organization.management.service.OrganizationManager;
 import org.wso2.carbon.usage.data.collector.identity.counter.OrganizationCounter;
 import org.wso2.carbon.usage.data.collector.identity.counter.UserCounter;
-import org.wso2.carbon.user.api.Tenant;
-import org.wso2.carbon.user.core.service.RealmService;
-import org.wso2.carbon.user.core.tenant.TenantManager;
 import org.wso2.carbon.usage.data.collector.identity.internal.UsageDataCollectorDataHolder;
 import org.wso2.carbon.usage.data.collector.identity.model.SystemUsage;
 import org.wso2.carbon.usage.data.collector.identity.model.TenantUsage;
+import org.wso2.carbon.user.api.Tenant;
+import org.wso2.carbon.user.core.service.RealmService;
+import org.wso2.carbon.user.core.tenant.TenantManager;
 
 import java.util.ArrayList;
 import java.util.List;
-
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Main service for collecting usage statistics.
@@ -100,35 +97,33 @@ public class UsageDataCollector {
             }
 
             // Calculate B2B organization count and total users
-            AtomicInteger totalB2BOrgs = new AtomicInteger(0);
-            AtomicInteger totalUsers = new AtomicInteger(0);
-            CountDownLatch latch = new CountDownLatch(allTenantDomains.size());
+            int totalB2BOrgs = 0;
+            int totalUsers = 0;
 
             for (String tenantDomain : allTenantDomains) {
-                executorService.submit(() -> {
-                    try {
-                        TenantUsage stats = processTenant(tenantDomain);
-                        // Add to totals
-                        totalB2BOrgs.addAndGet(stats.getB2bOrgCount());
-                        totalUsers.addAndGet(stats.getUserCount());
-
-                        if (LOG.isDebugEnabled()) {
-                            LOG.debug(String.format("✓ Processed: %s | B2B Orgs: %d | Users: %d",
-                                    tenantDomain, stats.getB2bOrgCount(), stats.getUserCount()));
-                        }
-                    } catch (Exception e) {
-                        LOG.error("Error in processing tenant: " + tenantDomain, e);
-                    } finally {
-                        latch.countDown();
+                try {
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Processing tenant: " + tenantDomain);
                     }
-                });
+                    TenantUsage stats = processTenant(tenantDomain);
+
+                    // Add to totals
+                    totalB2BOrgs += stats.getB2bOrgCount();
+                    totalUsers += stats.getUserCount();
+
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug(String.format("Processed: %s | B2B Orgs: %d | Users: %d",
+                                tenantDomain, stats.getB2bOrgCount(), stats.getUserCount()));
+                    }
+                } catch (Exception e) {
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Error processing tenant: " + tenantDomain, e);
+                        // Continue with next tenant
+                    }
+                }
             }
-
-            // Wait for all processing to complete
-            latch.await(PROCESSING_TIMEOUT_MINUTES, TimeUnit.MINUTES);
-
-            usage.setTotalB2BOrganizations(totalB2BOrgs.get());
-            usage.setTotalUsers(totalUsers.get());
+            usage.setTotalB2BOrganizations(totalB2BOrgs);
+            usage.setTotalUsers(totalUsers);
         } catch (Exception e) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Error calculating system statistics", e);
