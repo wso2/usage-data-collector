@@ -40,6 +40,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Manages the lifecycle and scheduling of usage data collection.
@@ -55,6 +56,7 @@ public class UsageDataCollectorServiceComponent {
     private static final long INITIAL_DELAY_SECONDS = 30;
     private static final long INTERVAL_SECONDS = 60;
     private static final long SHUTDOWN_TIMEOUT_SECONDS = 10;
+    private final AtomicBoolean hasRunUsageCollection = new AtomicBoolean(false);
 
     private UsageDataCollector collectorService;
     private ScheduledExecutorService scheduler;
@@ -112,16 +114,6 @@ public class UsageDataCollectorServiceComponent {
             } catch (InterruptedException e) {
                 scheduler.shutdownNow();
                 Thread.currentThread().interrupt();
-            }
-        }
-
-        if (collectorService != null) {
-            try {
-                collectorService.shutdown();
-            } catch (Exception e) {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Error shutting down collector service", e);
-                }
             }
         }
     }
@@ -182,21 +174,28 @@ public class UsageDataCollectorServiceComponent {
             CoordinatedActivity coordinatorListener = new CoordinatedActivity() {
                 @Override
                 public void execute() {
-                    LOG.debug("This node is the coordinator and will run the collectors.");
-                    runUsageCollectionTask();
+                    if (hasRunUsageCollection.compareAndSet(false, true)) {
+                        LOG.debug("This node is the coordinator and will run the collectors.");
+                        runUsageCollectionTask();
+                    } else {
+                        LOG.debug("Usage collection already executed, skipping duplicate execution.");
+                    }
                 }
             };
 
-            // Register the coordinated activity
+            // Register the coordinator activity.
             bundleContext.registerService(
                     CoordinatedActivity.class.getName(),
                     coordinatorListener,
                     null
             );
 
-            // Run the usage task for the first time if this node is co-ordinator.
+            // Run usage collection if this node is already the coordinator when the listener registers.
             if (ClusteringUtil.isCoordinator()) {
-                runUsageCollectionTask();
+                if (hasRunUsageCollection.compareAndSet(false, true)) {
+                    LOG.debug("Node is already coordinator. Running initial usage data collection.");
+                    runUsageCollectionTask();
+                }
             }
         } catch (Exception e) {
             if (LOG.isDebugEnabled()) {

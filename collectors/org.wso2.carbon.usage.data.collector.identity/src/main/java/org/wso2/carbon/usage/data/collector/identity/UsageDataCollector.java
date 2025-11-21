@@ -32,9 +32,6 @@ import org.wso2.carbon.user.core.tenant.TenantManager;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Main service for collecting usage statistics.
@@ -43,13 +40,10 @@ import java.util.concurrent.TimeUnit;
 public class UsageDataCollector {
 
     private static final Log LOG = LogFactory.getLog(UsageDataCollector.class);
-    private static final int THREAD_POOL_SIZE = 10;
-    private static final int PROCESSING_TIMEOUT_MINUTES = 15;
     public static final String SUPER_TENANT = "carbon.super";
 
     private final RealmService realmService;
     private final OrganizationManager organizationManager;
-    private final ExecutorService executorService;
     private final UserCounter userCountCalculator;
     private final OrganizationCounter orgCountCalculator;
 
@@ -57,7 +51,6 @@ public class UsageDataCollector {
 
         this.realmService = UsageDataCollectorDataHolder.getInstance().getRealmService();
         this.organizationManager = UsageDataCollectorDataHolder.getInstance().getOrganizationManager();
-        this.executorService = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
         this.userCountCalculator = new UserCounter(realmService, organizationManager);
         this.orgCountCalculator = new OrganizationCounter(organizationManager);
     }
@@ -154,25 +147,6 @@ public class UsageDataCollector {
             }
         }
         return stats;
-    }
-
-    /**
-     * Shutdown executor service
-     */
-    public void shutdown() {
-
-        if (executorService != null && !executorService.isShutdown()) {
-            executorService.shutdown();
-            try {
-                if (!executorService.awaitTermination(60, TimeUnit.SECONDS)) {
-                    executorService.shutdownNow();
-                }
-            } catch (InterruptedException e) {
-                executorService.shutdownNow();
-                Thread.currentThread().interrupt();
-            }
-        }
-        LOG.debug("Usage Data Collector Service is shutdown.");
     }
 
     // Todo: Need to remove this logic after implementing publisher.

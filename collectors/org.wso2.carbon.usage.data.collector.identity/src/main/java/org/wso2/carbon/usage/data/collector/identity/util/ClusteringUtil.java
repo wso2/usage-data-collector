@@ -69,17 +69,16 @@ public final class ClusteringUtil {
         ClusteringAgent agent = getClusteringAgent();
         if (agent == null) {
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Running in standalone mode - treating as coordinator");
+                LOG.debug("No clustering agent found");
             }
-            // In standalone mode, treat as coordinator for task execution
-            return true;
+            return false;
         }
 
-        boolean isCoord = agent.isCoordinator();
+        boolean isCoOrdinator = agent.isCoordinator();
         if (LOG.isDebugEnabled()) {
-            LOG.debug("Node is " + (isCoord ? "coordinator" : "not coordinator"));
+            LOG.debug("Node is " + (isCoOrdinator ? "coordinator" : "not coordinator"));
         }
-        return isCoord;
+        return isCoOrdinator;
     }
 
     /**
