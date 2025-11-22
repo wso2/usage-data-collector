@@ -65,7 +65,7 @@ public class DataSourceProvider {
             if (dataSource == null) {
                 log.warn("DataSource '" + dataSourceName + "' not available yet. Will retry on next access.");
             } else {
-                log.info("DataSource '" + dataSourceName + "' initialized successfully");
+                log.debug("DataSource '" + dataSourceName + "' initialized successfully");
             }
         }
     }
@@ -85,7 +85,7 @@ public class DataSourceProvider {
                     synchronized (this) {
                         if (dataSource == null) {
                             dataSource = ds;
-                            log.info("DataSource '" + dataSourceName + "' successfully loaded on attempt " +
+                            log.debug("DataSource '" + dataSourceName + "' successfully loaded on attempt " +
                                     (attempt + 1));
                         }
                     }
@@ -156,7 +156,7 @@ public class DataSourceProvider {
                     .invoke(carbonDataSource);
 
             if (dsObject instanceof DataSource) {
-                log.info("DataSource '" + dataSourceName + "' successfully retrieved via OSGi");
+                log.debug("DataSource '" + dataSourceName + "' successfully retrieved via OSGi");
                 return (DataSource) dsObject;
             } else if (dsObject != null) {
                 log.error("DSObject is not a DataSource. Type: " + dsObject.getClass().getName());

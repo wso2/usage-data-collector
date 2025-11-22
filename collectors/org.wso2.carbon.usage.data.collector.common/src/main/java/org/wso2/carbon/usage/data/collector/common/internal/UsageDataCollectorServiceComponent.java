@@ -52,7 +52,7 @@ public class UsageDataCollectorServiceComponent {
 
     // Hardcoded configuration for scheduler
     private static final long INITIAL_DELAY_SECONDS = 0;
-    private static final long INTERVAL_SECONDS = 30;
+    private static final long INTERVAL_SECONDS = 3600;
 
     private ScheduledExecutorService executorService;
     private ScheduledFuture<?> scheduledTask;

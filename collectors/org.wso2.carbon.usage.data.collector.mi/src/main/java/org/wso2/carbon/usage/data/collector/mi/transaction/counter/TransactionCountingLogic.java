@@ -30,6 +30,12 @@ public class TransactionCountingLogic {
                 axis2MessageContext = ((Axis2MessageContext) messageContext).getAxis2MessageContext();
             }
             if (axis2MessageContext != null) {
+                // Checking if the message is inbound
+                Object isInbound = messageContext.getProperty(TransactionCounterConstants.IS_INBOUND);
+                if (isInbound instanceof Boolean && (Boolean) isInbound) {
+                    return 1;
+                }
+
                 // Setting this property to identify request-response pairs
                 messageContext.setProperty(TransactionCounterConstants.IS_THERE_ASSOCIATED_INCOMING_REQUEST, true);
 
@@ -60,6 +66,9 @@ public class TransactionCountingLogic {
     }
 
     public static int handleResponseInFlow(MessageContext messageContext) {
+        if (messageContext == null) {
+            return 0;
+        }
         return 0;
     }
 
