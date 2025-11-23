@@ -19,6 +19,7 @@
 package org.wso2.carbon.usage.data.collector.mi.transaction.counter;
 
 public class TransactionCounterConstants {
+    public static final String IS_INBOUND = "isInbound";
 
     public static enum ServerType {
         GATEWAY, MI
