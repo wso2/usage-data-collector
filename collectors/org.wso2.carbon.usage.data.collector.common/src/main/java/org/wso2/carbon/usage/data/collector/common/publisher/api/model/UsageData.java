@@ -23,8 +23,7 @@ package org.wso2.carbon.usage.data.collector.common.publisher.api.model;
  */
 public abstract class UsageData {
 
-    protected String timestamp;
-    protected String dataType;
+    protected String createdTime;
 
     /**
      * Converts the usage data to JSON string representation.
@@ -33,20 +32,12 @@ public abstract class UsageData {
      */
     public abstract String toJson();
 
-    public String getTimestamp() {
-        return timestamp;
+    public String getCreatedTime() {
+        return createdTime;
     }
 
-    public void setTimestamp(String timestamp) {
-        this.timestamp = timestamp;
-    }
-
-    public String getDataType() {
-        return dataType;
-    }
-
-    public void setDataType(String dataType) {
-        this.dataType = dataType;
+    public void setCreatedTime(String createdTime) {
+        this.createdTime = createdTime;
     }
 }
 

@@ -23,7 +23,10 @@ import com.google.gson.JsonParser;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.wso2.carbon.usage.data.collector.common.collector.model.DeploymentData;
+import org.wso2.carbon.usage.data.collector.common.publisher.api.model.DeploymentInformation;
 import org.wso2.carbon.usage.data.collector.common.publisher.impl.HttpPublisher;
+import org.wso2.carbon.usage.data.collector.common.util.MetaInfoHolder;
+import org.wso2.carbon.usage.data.collector.common.util.UsageDataUtil;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -48,6 +51,8 @@ public class DeploymentDataCollector {
 
     /**
      * Collects deployment data and publishes it to the receiver.
+     * Includes cached meta information in the payload (from MetaInfoHolder).
+     * deploymentId and subscriptionKey are assigned by the receiver.
      */
     public void collectAndPublish() {
         try {
@@ -55,35 +60,72 @@ public class DeploymentDataCollector {
                 log.debug("Starting deployment data collection");
             }
 
-            DeploymentData data = new DeploymentData();
-
-            // Collect OS information
-            collectOperatingSystemInfo(data);
-
-            // Collect JDK information
-            collectJdkInfo(data);
-
-            // Set product information
-            collectProductInfo(data);
-
-            // Collect hardware information
-            collectHardwareInfo(data);
+            // Collect deployment data
+            DeploymentData data = collectDeploymentData();
 
             if(log.isDebugEnabled()) {
                 log.debug("Collected deployment data: " + data);
             }
 
-            // Publish the data
-            httpPublisher.publish(data);
+            // Build deployment info JSON object
+            JsonObject deploymentInfo = new JsonObject();
+            deploymentInfo.addProperty("os", data.getOperatingSystem());
+            deploymentInfo.addProperty("osVersion", data.getOperatingSystemVersion());
+            deploymentInfo.addProperty("osArchitecture", data.getOperatingSystemArchitecture());
+            deploymentInfo.addProperty("jdkVersion", data.getJdkVersion());
+            deploymentInfo.addProperty("jdkVendor", data.getJdkVendor());
+            deploymentInfo.addProperty("updateLevel", data.getUpdateLevel());
+            deploymentInfo.addProperty("numberOfCores", data.getNumberOfCores());
+
+            // Generate hash of the deployment info
+            String deploymentInfoHash = UsageDataUtil.generateSHA256Hash(deploymentInfo.toString());
+
+            // Create API-compliant model with cached meta information from MetaInfoHolder
+            DeploymentInformation deploymentInformation = new DeploymentInformation(
+                    MetaInfoHolder.getNodeId(),
+                    MetaInfoHolder.getProduct(),
+                    deploymentInfo,
+                    deploymentInfoHash
+            );
+
+            // Publish to /deployment-information endpoint
+            httpPublisher.publish(deploymentInformation);
 
             if(log.isDebugEnabled()) {
-                log.debug("Successfully collected and published deployment data");
+                log.debug("Deployment data published successfully");
             }
 
         } catch (Exception e) {
             log.error("Failed to collect and publish deployment data", e);
         }
     }
+
+    /**
+     * Collects deployment data without publishing.
+     * This method can be used by other components (e.g., MetaInformationManager)
+     * that need the deployment data.
+     *
+     * @return DeploymentData containing collected information
+     */
+    public DeploymentData collectDeploymentData() {
+        DeploymentData data = new DeploymentData();
+
+        // Collect OS information
+        collectOperatingSystemInfo(data);
+
+        // Collect JDK information
+        collectJdkInfo(data);
+
+        // Set product information
+        collectProductInfo(data);
+
+        // Collect hardware information
+        collectHardwareInfo(data);
+
+        return data;
+    }
+
+
 
     /**
      * Collects operating system information.
