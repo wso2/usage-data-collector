@@ -16,28 +16,15 @@
  * under the License.
  */
 
-package org.wso2.carbon.usage.data.collector.common.publisher.api.model;
+package org.wso2.carbon.usage.data.collector.identity.util;
 
 /**
- * Base class for all usage data models.
+ * Constants related to usage collection.
  */
-public abstract class UsageData {
+public class UsageCollectorConstants {
 
-    protected String createdTime;
+    private UsageCollectorConstants() {}
 
-    /**
-     * Converts the usage data to JSON string representation.
-     *
-     * @return JSON string
-     */
-    public abstract String toJson();
+    public static final String USERNAME_CLAIM = "http://wso2.org/claims/username";
 
-    public String getCreatedTime() {
-        return createdTime;
-    }
-
-    public void setCreatedTime(String createdTime) {
-        this.createdTime = createdTime;
-    }
 }
-

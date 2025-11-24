@@ -25,6 +25,7 @@ import java.time.Instant;
 
 /**
  * Model class representing deployment data to be collected and published.
+ * Internal use only - for collection purposes. Use DeploymentInformation for publishing.
  */
 public class DeploymentData extends UsageData {
 
@@ -39,8 +40,7 @@ public class DeploymentData extends UsageData {
 
     public DeploymentData() {
         super();
-        this.timestamp = Instant.now().toString();
-        this.dataType = "DEPLOYMENT_DATA";
+        this.createdTime = Instant.now().toString();
     }
 
     @Override
@@ -117,8 +117,7 @@ public class DeploymentData extends UsageData {
     @Override
     public String toString() {
         return "DeploymentData{" +
-                "timestamp='" + timestamp + '\'' +
-                ", dataType='" + dataType + '\'' +
+                "createdTime='" + createdTime + '\'' +
                 ", operatingSystem='" + operatingSystem + '\'' +
                 ", operatingSystemVersion='" + operatingSystemVersion + '\'' +
                 ", operatingSystemArchitecture='" + operatingSystemArchitecture + '\'' +
