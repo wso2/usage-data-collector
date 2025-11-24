@@ -18,6 +18,7 @@
 
 package org.wso2.carbon.usage.data.collector.common.collector;
 
+import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.apache.commons.logging.Log;
@@ -31,6 +32,8 @@ import org.wso2.carbon.usage.data.collector.common.util.UsageDataUtil;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
+import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * Main collector class that collects deployment information and publishes it.
@@ -77,8 +80,20 @@ public class DeploymentDataCollector {
             deploymentInfo.addProperty("updateLevel", data.getUpdateLevel());
             deploymentInfo.addProperty("numberOfCores", data.getNumberOfCores());
 
-            // Generate hash of the deployment info
-            String deploymentInfoHash = UsageDataUtil.generateSHA256Hash(deploymentInfo.toString());
+            // Generate hash of the deployment info using canonical form (sorted keys)
+            // TreeMap ensures consistent ordering for predictable hash values
+            Map<String, Object> sortedDeploymentInfo = new TreeMap<>();
+            sortedDeploymentInfo.put("jdkVendor", data.getJdkVendor());
+            sortedDeploymentInfo.put("jdkVersion", data.getJdkVersion());
+            sortedDeploymentInfo.put("numberOfCores", data.getNumberOfCores());
+            sortedDeploymentInfo.put("os", data.getOperatingSystem());
+            sortedDeploymentInfo.put("osArchitecture", data.getOperatingSystemArchitecture());
+            sortedDeploymentInfo.put("osVersion", data.getOperatingSystemVersion());
+            sortedDeploymentInfo.put("updateLevel", data.getUpdateLevel());
+
+            Gson gson = new Gson();
+            String canonicalJson = gson.toJson(sortedDeploymentInfo);
+            String deploymentInfoHash = UsageDataUtil.generateSHA256Hash(canonicalJson);
 
             // Create API-compliant model with cached meta information from MetaInfoHolder
             DeploymentInformation deploymentInformation = new DeploymentInformation(
