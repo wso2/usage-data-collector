@@ -1,0 +1,68 @@
+/*
+ * Copyright (c) 2025, WSO2 LLC. (http://www.wso2.com) All Rights Reserved.
+ *
+ * WSO2 LLC. licenses this file to you under the Apache License,
+ * Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+package org.wso2.carbon.usage.data.collector.apim.collector.transaction.publisher;
+
+import org.wso2.carbon.usage.data.collector.apim.collector.transaction.record.TransactionReport;
+
+/**
+ * Interface for APIM transaction reporting service.
+ * This service collects and reports transaction information periodically
+ * to the common usage data collector module.
+ */
+public interface TransactionPublisher {
+
+    /**
+     * Starts the periodic transaction reporting.
+     * This method should be called to begin collecting and reporting
+     * transaction data at regular intervals.
+     */
+    void startReporting();
+
+    /**
+     * Stops the periodic transaction reporting.
+     * This method should be called to stop the reporting process.
+     */
+    void stopReporting();
+
+    /**
+     * Reports current transaction data immediately.
+     * This method can be called to force an immediate report
+     * of current transaction statistics.
+     *
+     * @return true if reporting was successful, false otherwise
+     */
+    boolean reportNow();
+
+    /**
+     * Checks if the transaction reporter is currently active.
+     *
+     * @return true if reporting is active, false otherwise
+     */
+    boolean isReportingActive();
+
+    /**
+     * Publishes a specific transaction report.
+     * This method is used by the aggregator to publish transaction data.
+     *
+     * @param report The transaction report to publish
+     * @return true if publishing was successful, false otherwise
+     */
+    boolean publishTransaction(TransactionReport report);
+}
+
