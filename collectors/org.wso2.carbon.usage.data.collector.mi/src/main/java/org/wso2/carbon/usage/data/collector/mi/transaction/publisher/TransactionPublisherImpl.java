@@ -60,7 +60,7 @@ public class TransactionPublisherImpl implements TransactionPublisher {
     }
 
     private org.wso2.carbon.usage.data.collector.common.publisher.api.model.ApiRequest createApiRequestFromReport(TransactionReport report) {
-        TransactionApiCountData usageData = new TransactionApiCountData();
+        TransactionUsageData usageData = new TransactionUsageData();
         usageData.setNodeId(getActualNetworkIpAddress());
         usageData.setProduct(getProductNameAndVersion());
         usageData.setCount(report.getTotalCount());
@@ -88,7 +88,7 @@ public class TransactionPublisherImpl implements TransactionPublisher {
         return product + "-" + version;
     }
 
-    private static class TransactionApiCountData extends org.wso2.carbon.usage.data.collector.common.publisher.api.model.UsageData {
+    private static class TransactionUsageData extends org.wso2.carbon.usage.data.collector.common.publisher.api.model.UsageData {
         private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
         private String nodeId;
         private String product;
@@ -123,7 +123,7 @@ public class TransactionPublisherImpl implements TransactionPublisher {
                 map.put("createdTime", createdTime);
                 return OBJECT_MAPPER.writeValueAsString(map);
             } catch (Exception e) {
-                throw new RuntimeException("Failed to serialize TransactionApiCountData to JSON", e);
+                throw new RuntimeException("Failed to serialize TransactionUsageData to JSON", e);
             }
         }
     }
