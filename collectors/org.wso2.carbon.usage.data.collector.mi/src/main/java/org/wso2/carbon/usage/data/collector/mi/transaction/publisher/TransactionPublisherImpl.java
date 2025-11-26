@@ -29,6 +29,7 @@ import org.osgi.service.component.annotations.ReferenceCardinality;
 import org.osgi.service.component.annotations.ReferencePolicy;
 import org.wso2.carbon.usage.data.collector.common.publisher.api.Publisher;
 import org.wso2.carbon.usage.data.collector.mi.transaction.record.TransactionReport;
+import org.wso2.micro.integrator.core.services.CarbonServerConfigurationService;
 
 /**
  * Transaction Report Publisher implementation.
@@ -48,8 +49,8 @@ public class TransactionPublisherImpl implements TransactionPublisher {
 
     @Activate
     protected void activate() {
-        org.wso2.carbon.usage.data.collector.mi.transaction.counter.TransactionCountHandler.registerTransactionPublisher(
-                this);
+    org.wso2.carbon.usage.data.collector.mi.transaction.counter.TransactionCountHandler.registerTransactionPublisher(
+        this);
     }
 
     @Deactivate
@@ -59,13 +60,12 @@ public class TransactionPublisherImpl implements TransactionPublisher {
     }
 
     private org.wso2.carbon.usage.data.collector.common.publisher.api.model.ApiRequest createApiRequestFromReport(TransactionReport report) {
-        TransactionUsageData usageData = new TransactionUsageData();
-        usageData.setDataType("TRANSACTION_DATA");
-        usageData.setTimestamp(new java.util.Date().toInstant().toString());
-        usageData.setTransactionCount(report.getTotalCount());
-        usageData.setHourStartTime(report.getHourStartTime());
-        usageData.setHourEndTime(report.getHourEndTime());
-        usageData.setReportId(report.getId());
+        TransactionApiCountData usageData = new TransactionApiCountData();
+        usageData.setNodeId(getActualNetworkIpAddress());
+        usageData.setProduct(getProductNameAndVersion());
+        usageData.setCount(report.getTotalCount());
+        usageData.setType("TRANSACTION_COUNT");
+        usageData.setCreatedTime(java.time.Instant.ofEpochMilli(report.getHourEndTime()).toString());
 
         return new org.wso2.carbon.usage.data.collector.common.publisher.api.model.ApiRequest.Builder()
                 .withEndpoint("transaction-reports")
@@ -73,45 +73,79 @@ public class TransactionPublisherImpl implements TransactionPublisher {
                 .build();
     }
 
-    private static class TransactionUsageData extends org.wso2.carbon.usage.data.collector.common.publisher.api.model.UsageData {
+    private String getProductNameAndVersion() {
+        String product = "wso2mi";
+        String version = "unknown";
+        try {
+            version =  CarbonServerConfigurationService.getInstance()
+                    .getServerVersion();
+        } catch (Exception e) {
+            LOG.debug("Unable to get MI version from CarbonServerConfigurationService", e);
+        }
+        return product + "-" + version;
+    }
+
+    private static class TransactionApiCountData extends org.wso2.carbon.usage.data.collector.common.publisher.api.model.UsageData {
         private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-        private long transactionCount;
-        private long hourStartTime;
-        private long hourEndTime;
-        private String reportId;
+        private String nodeId;
+        private String product;
+        private long count;
+        private String type;
+        private String createdTime;
 
-        public void setTransactionCount(long transactionCount) {
-            this.transactionCount = transactionCount;
+        public void setNodeId(String nodeId) {
+            this.nodeId = nodeId;
         }
-
-        public void setHourStartTime(long hourStartTime) {
-            this.hourStartTime = hourStartTime;
+        public void setProduct(String product) {
+            this.product = product;
         }
-
-        public void setHourEndTime(long hourEndTime) {
-            this.hourEndTime = hourEndTime;
+        public void setCount(long count) {
+            this.count = count;
         }
-
-        public void setReportId(String reportId) {
-            this.reportId = reportId;
+        public void setType(String type) {
+            this.type = type;
+        }
+        public void setCreatedTime(String createdTime) {
+            this.createdTime = createdTime;
         }
 
         @Override
         public String toJson() {
             try {
                 java.util.Map<String, Object> map = new java.util.HashMap<>();
-                map.put("dataType", getDataType());
-                map.put("timestamp", getTimestamp());
-                map.put("transactionCount", transactionCount);
-                map.put("hourStartTime", hourStartTime);
-                map.put("hourEndTime", hourEndTime);
-                map.put("reportId", reportId);
+                map.put("nodeId", nodeId);
+                map.put("product", product);
+                map.put("count", count);
+                map.put("type", type);
+                map.put("createdTime", createdTime);
                 return OBJECT_MAPPER.writeValueAsString(map);
             } catch (Exception e) {
-                throw new RuntimeException("Failed to serialize TransactionUsageData to JSON", e);
+                throw new RuntimeException("Failed to serialize TransactionApiCountData to JSON", e);
             }
         }
     }
+
+    private String getActualNetworkIpAddress() {
+        try {
+            java.util.Enumeration<java.net.NetworkInterface> interfaces = java.net.NetworkInterface.getNetworkInterfaces();
+            while (interfaces.hasMoreElements()) {
+                java.net.NetworkInterface iface = interfaces.nextElement();
+                if (iface.isLoopback() || !iface.isUp()) continue;
+                java.util.Enumeration<java.net.InetAddress> addresses = iface.getInetAddresses();
+                while (addresses.hasMoreElements()) {
+                    java.net.InetAddress addr = addresses.nextElement();
+                    if (!addr.isLoopbackAddress() && addr instanceof java.net.Inet4Address) {
+                        return addr.getHostAddress();
+                    }
+                }
+            }
+        } catch (Exception e) {
+            LOG.debug("Unable to get actual network IP address, defaulting to 'unknown'", e);
+        }
+        return "unknown";
+    }
+
+
 
     @Reference(
             cardinality = ReferenceCardinality.OPTIONAL,
@@ -129,7 +163,7 @@ public class TransactionPublisherImpl implements TransactionPublisher {
     @Override
     public void startReporting() {
         if (publisher == null) {
-            LOG.warn("Cannot start reporting - Publisher service not available");
+            LOG.debug("Cannot start reporting - Publisher service not available");
             return;
         }
         aggregator = org.wso2.carbon.usage.data.collector.mi.transaction.aggregator.TransactionAggregator.getInstance();
@@ -163,7 +197,7 @@ public class TransactionPublisherImpl implements TransactionPublisher {
             currentPublisher = this.publisher;
         }
         if (currentPublisher == null) {
-            LOG.warn("TransactionReportPublisher: Cannot publish - Publisher service not available via OSGi");
+            LOG.debug("TransactionReportPublisher: Cannot publish - Publisher service not available via OSGi");
             return false;
         }
 
@@ -189,7 +223,7 @@ public class TransactionPublisherImpl implements TransactionPublisher {
     @Override
     public boolean reportNow() {
         if (publisher == null) {
-            LOG.warn("Cannot report - Publisher service not available");
+            LOG.debug("Cannot report - Publisher service not available");
             return false;
         }
         if (aggregator == null) {
