@@ -77,8 +77,11 @@ public class TransactionPublisherImpl implements TransactionPublisher {
         String product = "wso2mi";
         String version = "unknown";
         try {
-            version =  CarbonServerConfigurationService.getInstance()
+            String serverVersion = CarbonServerConfigurationService.getInstance()
                     .getServerVersion();
+            if (serverVersion != null && !serverVersion.isEmpty()) {
+                version = serverVersion;
+            }
         } catch (Exception e) {
             LOG.debug("Unable to get MI version from CarbonServerConfigurationService", e);
         }
