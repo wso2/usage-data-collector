@@ -58,7 +58,7 @@ public class TransactionAggregator {
     
     public void init(TransactionPublisher publisher) {
         if (publisher == null) {
-            LOG.warn("TransactionPublisher is null. Hourly aggregation will be disabled.");
+            LOG.debug("TransactionPublisher is null. Hourly aggregation will be disabled.");
             return;
         }
 
@@ -75,7 +75,7 @@ public class TransactionAggregator {
             scheduledExecutorService.shutdownNow();
             try {
                 if (!scheduledExecutorService.awaitTermination(5, TimeUnit.SECONDS)) {
-                    LOG.warn("Existing TransactionAggregator executor did not terminate in time");
+                    LOG.debug("Existing TransactionAggregator executor did not terminate in time");
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -153,7 +153,7 @@ public class TransactionAggregator {
             scheduledExecutorService.shutdownNow();
             try {
                 if (!scheduledExecutorService.awaitTermination(5, TimeUnit.SECONDS)) {
-                    LOG.warn("TransactionAggregator did not terminate in time");
+                    LOG.debug("TransactionAggregator did not terminate in time");
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
