@@ -29,6 +29,7 @@ import org.osgi.service.component.annotations.ReferenceCardinality;
 import org.osgi.service.component.annotations.ReferencePolicy;
 import org.wso2.carbon.usage.data.collector.common.collector.DeploymentDataCollector;
 import org.wso2.carbon.usage.data.collector.common.collector.DeploymentDataCollectorTask;
+import org.wso2.carbon.usage.data.collector.common.collector.MetaInformationPublisher;
 import org.wso2.carbon.usage.data.collector.common.publisher.api.Publisher;
 import org.wso2.carbon.usage.data.collector.common.publisher.impl.HttpPublisher;
 
@@ -99,7 +100,13 @@ public class UsageDataCollectorServiceComponent {
                 return;
             }
 
+            // Publish MetaInformation to /meta-information endpoint at startup
+            // This also initializes the MetaInfoHolder cache for use in all payloads
+            MetaInformationPublisher metaInfoPublisher = new MetaInformationPublisher(httpPublisher);
+            metaInfoPublisher.publishAtStartup();
+
             // Create deployment data collector with http publisher
+            // Note: Meta information is included in every payload using cached values from MetaInfoHolder
             DeploymentDataCollector collector = new DeploymentDataCollector(httpPublisher);
 
             // Initialize scheduler
@@ -120,11 +127,9 @@ public class UsageDataCollectorServiceComponent {
                 TimeUnit.SECONDS
             );
 
-            if(log.isDebugEnabled()) {
-                log.debug("Usage Data Collector Service activated successfully - " +
-                        "scheduled with initial delay: " + INITIAL_DELAY_SECONDS +
-                        "s, interval: " + INTERVAL_SECONDS + "s");
-            }
+            log.info("Usage Data Collector Service activated successfully - " +
+                    "scheduled with initial delay: " + INITIAL_DELAY_SECONDS +
+                    "s, interval: " + INTERVAL_SECONDS + "s");
         } catch (Exception e) {
             log.error("Failed to activate Usage Data Collector Service Component", e);
         }
