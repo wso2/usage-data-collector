@@ -87,13 +87,6 @@
             <version>${commons-logging.version}</version>
             <scope>provided</scope>
         </dependency>
-        <!-- Micro Integrator Observability -->
-        <dependency>
-            <groupId>org.wso2.ei</groupId>
-            <artifactId>org.wso2.micro.integrator.observability</artifactId>
-            <version>${ei.observability.version}</version>
-            <scope>provided</scope>
-        </dependency>
     </dependencies>
 
     <build>

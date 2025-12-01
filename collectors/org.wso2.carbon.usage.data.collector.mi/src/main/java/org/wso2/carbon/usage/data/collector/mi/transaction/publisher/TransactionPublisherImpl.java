@@ -28,8 +28,8 @@ import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ReferenceCardinality;
 import org.osgi.service.component.annotations.ReferencePolicy;
 import org.wso2.carbon.usage.data.collector.common.publisher.api.Publisher;
+import org.wso2.carbon.usage.data.collector.common.util.MetaInfoHolder;
 import org.wso2.carbon.usage.data.collector.mi.transaction.record.TransactionReport;
-import org.wso2.micro.integrator.core.services.CarbonServerConfigurationService;
 
 /**
  * Transaction Report Publisher implementation.
@@ -61,8 +61,8 @@ public class TransactionPublisherImpl implements TransactionPublisher {
 
     private org.wso2.carbon.usage.data.collector.common.publisher.api.model.ApiRequest createApiRequestFromReport(TransactionReport report) {
         TransactionUsageData usageData = new TransactionUsageData();
-        usageData.setNodeId(getActualNetworkIpAddress());
-        usageData.setProduct(getProductNameAndVersion());
+        usageData.setNodeId(MetaInfoHolder.getNodeId());
+        usageData.setProduct(MetaInfoHolder.getProduct());
         usageData.setCount(report.getTotalCount());
         usageData.setType("TRANSACTION_COUNT");
         usageData.setCreatedTime(java.time.Instant.ofEpochMilli(report.getHourEndTime()).toString());
@@ -71,21 +71,6 @@ public class TransactionPublisherImpl implements TransactionPublisher {
                 .withEndpoint("transaction-reports")
                 .withData(usageData)
                 .build();
-    }
-
-    private String getProductNameAndVersion() {
-        String product = "wso2mi";
-        String version = "unknown";
-        try {
-            String serverVersion = CarbonServerConfigurationService.getInstance()
-                    .getServerVersion();
-            if (serverVersion != null && !serverVersion.isEmpty()) {
-                version = serverVersion;
-            }
-        } catch (Exception e) {
-            LOG.debug("Unable to get MI version from CarbonServerConfigurationService", e);
-        }
-        return product + "-" + version;
     }
 
     private static class TransactionUsageData extends org.wso2.carbon.usage.data.collector.common.publisher.api.model.UsageData {
@@ -127,28 +112,6 @@ public class TransactionPublisherImpl implements TransactionPublisher {
             }
         }
     }
-
-    private String getActualNetworkIpAddress() {
-        try {
-            java.util.Enumeration<java.net.NetworkInterface> interfaces = java.net.NetworkInterface.getNetworkInterfaces();
-            while (interfaces.hasMoreElements()) {
-                java.net.NetworkInterface iface = interfaces.nextElement();
-                if (iface.isLoopback() || !iface.isUp()) continue;
-                java.util.Enumeration<java.net.InetAddress> addresses = iface.getInetAddresses();
-                while (addresses.hasMoreElements()) {
-                    java.net.InetAddress addr = addresses.nextElement();
-                    if (!addr.isLoopbackAddress() && addr instanceof java.net.Inet4Address) {
-                        return addr.getHostAddress();
-                    }
-                }
-            }
-        } catch (Exception e) {
-            LOG.debug("Unable to get actual network IP address, defaulting to 'unknown'", e);
-        }
-        return "unknown";
-    }
-
-
 
     @Reference(
             cardinality = ReferenceCardinality.OPTIONAL,
