@@ -40,7 +40,6 @@ import org.wso2.carbon.usage.data.collector.common.publisher.api.model.ApiRespon
 import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.sql.DataSource;
-import java.io.IOException;
 
 /**
  * APIM Publisher implementation.
@@ -53,13 +52,11 @@ import java.io.IOException;
 )
 public class ApimPublisher implements Publisher {
 
-    private static final Log LOG = LogFactory.getLog(ApimPublisher.class);
+    private static final Log log = LogFactory.getLog(ApimPublisher.class);
 
     private static final String APIM_DATASOURCE_NAME = "jdbc/WSO2AM_DB";
-    private static final String RECEIVER_ENDPOINT = "receiver.endpoint";
-    private static final String WSO2_ENDPOINT = "wso2.endpoint";
-    private static final int MAX_RETRIES = 3;
-    private static final int RETRY_DELAY_MS = 1000;
+    private static final String RECEIVER_BASE_URL = "https://localhost:9443";
+    private static final String WSO2_BASE_URL = "https://api.wso2.com";
 
     private DataSource dataSource;
     private HttpClient httpClient;
@@ -78,16 +75,15 @@ public class ApimPublisher implements Publisher {
             httpClient = HttpClientBuilder.create()
                     .setSSLSocketFactory(sslsf)
                     .build();
-
-            LOG.info("ApimPublisher activated successfully");
         } catch (Exception e) {
-            LOG.error("Error activating ApimPublisher", e);
+            if(log.isDebugEnabled()) {
+                log.error("Error activating ApimPublisher", e);
+            }
         }
     }
 
     @Deactivate
     protected void deactivate() {
-        LOG.info("ApimPublisher deactivated");
     }
 
     @Override
@@ -98,10 +94,11 @@ public class ApimPublisher implements Publisher {
                     try {
                         Context ctx = new InitialContext();
                         dataSource = (DataSource) ctx.lookup(APIM_DATASOURCE_NAME);
-                        LOG.info("Successfully retrieved APIM DataSource: " + APIM_DATASOURCE_NAME);
                     } catch (Exception e) {
                         String errorMsg = "Failed to retrieve APIM DataSource: " + APIM_DATASOURCE_NAME;
-                        LOG.error(errorMsg, e);
+                        if(log.isDebugEnabled()) {
+                            log.error(errorMsg, e);
+                        }
                         throw new PublisherException(errorMsg, e);
                     }
                 }
@@ -112,76 +109,63 @@ public class ApimPublisher implements Publisher {
 
     @Override
     public ApiResponse callReceiverApi(ApiRequest request) throws PublisherException {
-        return callApiWithRetry(request, RECEIVER_ENDPOINT);
+        return executeApiCall(request, RECEIVER_BASE_URL);
     }
 
     @Override
     public ApiResponse callWso2Api(ApiRequest request) throws PublisherException {
-        return callApiWithRetry(request, WSO2_ENDPOINT);
+        return executeApiCall(request, WSO2_BASE_URL);
     }
 
-    private ApiResponse callApiWithRetry(ApiRequest request, String endpointKey) throws PublisherException {
-        int retries = 0;
-        Exception lastException = null;
-
-        while (retries < MAX_RETRIES) {
-            try {
-                return performApiCall(request, endpointKey);
-            } catch (Exception e) {
-                lastException = e;
-                retries++;
-                if (retries < MAX_RETRIES) {
-                    LOG.warn("API call failed (attempt " + retries + "/" + MAX_RETRIES + "), retrying...", e);
-                    try {
-                        Thread.sleep(RETRY_DELAY_MS * retries);
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                        throw new PublisherException("Interrupted while retrying API call", ie);
-                    }
-                }
+    /**
+     * Executes an API call without retry logic.
+     * Retry logic and response validation should be handled by the caller.
+     *
+     * @param request The API request
+     * @param baseUrl The base endpoint URL
+     * @return ApiResponse containing status code and response body
+     * @throws PublisherException if the request fails
+     */
+    private ApiResponse executeApiCall(ApiRequest request, String baseUrl) throws PublisherException {
+        try {
+            String fullUrl = baseUrl;
+            if (request.getEndpoint() != null && !request.getEndpoint().isEmpty()) {
+                fullUrl = baseUrl + "/" + request.getEndpoint();
             }
-        }
 
-        String errorMsg = "API call failed after " + MAX_RETRIES + " retries";
-        LOG.error(errorMsg, lastException);
-        throw new PublisherException(errorMsg, lastException);
-    }
+            HttpPost httpPost = new HttpPost(fullUrl);
+            httpPost.setHeader("Content-Type", "application/json");
+            httpPost.setHeader("Accept", "application/json");
+            httpPost.setHeader("User-Agent", "WSO2-APIM-Usage-Data-Collector/1.0");
 
-    private ApiResponse performApiCall(ApiRequest request, String endpointKey) throws IOException {
-        // Get endpoint URL from system properties or configuration
-        String baseUrl = System.getProperty(endpointKey);
-        if (baseUrl == null || baseUrl.isEmpty()) {
-            throw new IOException("Endpoint not configured: " + endpointKey);
-        }
+            // Add custom headers if present
+            if (request.getHeaders() != null) {
+                request.getHeaders().forEach(httpPost::setHeader);
+            }
 
-        String fullUrl = baseUrl;
-        if (request.getEndpoint() != null && !request.getEndpoint().isEmpty()) {
-            fullUrl = baseUrl + "/" + request.getEndpoint();
-        }
+            // Set request body
+            if (request.getData() != null) {
+                String jsonData = request.getData().toJson();
+                httpPost.setEntity(new StringEntity(jsonData, "UTF-8"));
+            }
 
-        HttpPost httpPost = new HttpPost(fullUrl);
-        httpPost.setHeader("Content-Type", "application/json");
+            HttpResponse response = httpClient.execute(httpPost);
+            int statusCode = response.getStatusLine().getStatusCode();
+            String responseBody = EntityUtils.toString(response.getEntity());
 
-        // Add custom headers if present
-        if (request.getHeaders() != null) {
-            request.getHeaders().forEach(httpPost::setHeader);
-        }
-
-        // Set request body
-        if (request.getData() != null) {
-            String jsonData = request.getData().toJson();
-            httpPost.setEntity(new StringEntity(jsonData));
-        }
-
-        HttpResponse response = httpClient.execute(httpPost);
-        int statusCode = response.getStatusLine().getStatusCode();
-        String responseBody = EntityUtils.toString(response.getEntity());
-
-        boolean success = statusCode >= 200 && statusCode < 300;
-        if (success) {
-            return ApiResponse.success(statusCode, responseBody);
-        } else {
-            return ApiResponse.failure(statusCode, responseBody);
+            // Return response without validating status code
+            // Caller is responsible for determining success/failure
+            if (statusCode >= 200 && statusCode < 300) {
+                return ApiResponse.success(statusCode, responseBody);
+            } else {
+                return ApiResponse.failure(statusCode, responseBody);
+            }
+        } catch (Exception e) {
+            String errorMsg = "Failed to execute API call to " + baseUrl;
+            if(log.isDebugEnabled()) {
+                log.error(errorMsg, e);
+            }
+            throw new PublisherException(errorMsg, e);
         }
     }
 }

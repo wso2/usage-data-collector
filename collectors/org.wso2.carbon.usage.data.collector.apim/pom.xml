@@ -109,8 +109,8 @@
                             org.apache.commons.logging.*,
                             org.apache.synapse.*;version="${synapse.version}",
                             org.apache.axis2.*;version="${axis2.version}",
-                            com.fasterxml.jackson.*;version="${jackson.version}",
                             org.wso2.carbon.usage.data.collector.common.publisher.api.*;version="${project.version}",
+                            org.wso2.carbon.usage.data.collector.common.util.*;version="${project.version}",
                             org.osgi.service.*;version="${imp.package.version.osgi.service}",
                             javax.sql,
                             javax.naming,
@@ -137,7 +137,7 @@
     </build>
     <properties>
         <synapse.version>[4.0.0,5.0.0)</synapse.version>
-        <axis2.version>[1.7.0,2.0.0)</axis2.version>
+        <axis2.version>[1.6.1,2.0.0)</axis2.version>
         <jackson.version>2.16.0</jackson.version>
     </properties>
     <repositories>

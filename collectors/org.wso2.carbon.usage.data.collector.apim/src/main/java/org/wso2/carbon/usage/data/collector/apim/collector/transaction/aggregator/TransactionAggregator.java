@@ -20,8 +20,13 @@ package org.wso2.carbon.usage.data.collector.apim.collector.transaction.aggregat
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.wso2.carbon.usage.data.collector.apim.collector.transaction.publisher.TransactionPublisher;
-import org.wso2.carbon.usage.data.collector.apim.collector.transaction.record.TransactionReport;
+import org.wso2.carbon.usage.data.collector.common.publisher.api.Publisher;
+import org.wso2.carbon.usage.data.collector.common.publisher.api.PublisherException;
+import org.wso2.carbon.usage.data.collector.common.publisher.api.model.ApiRequest;
+import org.wso2.carbon.usage.data.collector.common.publisher.api.model.ApiResponse;
+import org.wso2.carbon.usage.data.collector.common.publisher.api.model.UsageCount;
+import org.wso2.carbon.usage.data.collector.common.util.MetaInfoHolder;
+import org.wso2.carbon.usage.data.collector.apim.internal.ApimUsageDataCollectorConstants;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -30,15 +35,11 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class TransactionAggregator {
 
-    public long getCurrentHourStartTime() {
-        return currentHourStartTime;
-    }
-
-    private static final Log LOG = LogFactory.getLog(TransactionAggregator.class);
+    private static final Log log = LogFactory.getLog(TransactionAggregator.class);
     private static volatile TransactionAggregator instance = null;
 
     private final AtomicLong hourlyTransactionCount = new AtomicLong(0);
-    private TransactionPublisher publisher;
+    private Publisher publisher;
     private ScheduledExecutorService scheduledExecutorService;
     private long currentHourStartTime;
     private boolean enabled = false;
@@ -56,30 +57,33 @@ public class TransactionAggregator {
         return instance;
     }
 
-    public void init(TransactionPublisher publisher) {
+    public void init(Publisher publisher) {
         if (publisher == null) {
-            LOG.warn("TransactionPublisher is null. Hourly aggregation will be disabled.");
+            if(log.isDebugEnabled()) {
+                log.warn("Publisher is null. Hourly aggregation will be disabled.");
+            }
             return;
         }
 
         // If executor already exists and is active, skip re-init
         if (scheduledExecutorService != null && !scheduledExecutorService.isShutdown() && enabled) {
-            LOG.info("TransactionAggregator is already initialized and running. Skipping re-initialization.");
             return;
         }
 
         // If executor exists (whether shut down or not), clean it up before re-init
         if (scheduledExecutorService != null) {
-            LOG.info("Cleaning up existing TransactionAggregator executor before re-initialization.");
-
             scheduledExecutorService.shutdownNow();
             try {
                 if (!scheduledExecutorService.awaitTermination(5, TimeUnit.SECONDS)) {
-                    LOG.warn("Existing TransactionAggregator executor did not terminate in time");
+                    if(log.isDebugEnabled()) {
+                        log.warn("Existing TransactionAggregator executor did not terminate in time");
+                    }
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                LOG.error("Interrupted while shutting down executor", e);
+                if(log.isDebugEnabled()) {
+                    log.error("Interrupted while shutting down executor", e);
+                }
             }
 
             scheduledExecutorService = null;
@@ -100,7 +104,9 @@ public class TransactionAggregator {
             );
             this.enabled = true;
         } catch (Exception e) {
-            LOG.error("TransactionAggregator: Failed to schedule periodic task", e);
+            if(log.isDebugEnabled()) {
+                log.error("TransactionAggregator: Failed to schedule periodic task", e);
+            }
             this.enabled = false;
         }
     }
@@ -117,28 +123,48 @@ public class TransactionAggregator {
             long count = hourlyTransactionCount.getAndSet(0);
             long hourEndTime = System.currentTimeMillis();
 
-            // Always send transaction report, even when count is zero
-            TransactionReport summary = new TransactionReport(
-                count,
-                currentHourStartTime,
-                hourEndTime
-            );
-
-            publisher.publishTransaction(summary);
+            // Always send transaction count, even when count is zero
+            publishTransaction(count, currentHourStartTime, hourEndTime);
 
             currentHourStartTime = hourEndTime;
 
         } catch (Exception e) {
-            LOG.error("TransactionAggregator: Error while publishing hourly transaction count", e);
+            if(log.isDebugEnabled()) {
+                log.error("TransactionAggregator: Error while publishing hourly transaction count", e);
+            }
         }
     }
 
-    public long getAndResetCurrentHourlyCount() {
-        return hourlyTransactionCount.getAndSet(0);
-    }
+    /**
+     * Publish transaction count using Publisher.publishToReceiver() which has built-in retry logic.
+     */
+    private void publishTransaction(long count, long periodStartTime, long periodEndTime) {
+        if (publisher == null) {
+            if(log.isDebugEnabled()) {
+                log.warn("Cannot publish transaction - Publisher not available");
+            }
+            return;
+        }
 
-    public long getCurrentHourlyCount() {
-        return hourlyTransactionCount.get();
+        try {
+            String nodeId = MetaInfoHolder.getNodeId();
+            String product = MetaInfoHolder.getProduct();
+
+            UsageCount usageCount = new UsageCount(nodeId, product, count,
+                    ApimUsageDataCollectorConstants.TRANSACTION_TYPE);
+
+            ApiRequest request = new ApiRequest.Builder()
+                    .withEndpoint(ApimUsageDataCollectorConstants.USAGE_COUNT_ENDPOINT)
+                    .withData(usageCount)
+                    .build();
+
+            // Publisher.publishToReceiver() handles retry logic automatically
+            ApiResponse response = publisher.publishToReceiver(request);
+        } catch (PublisherException e) {
+            if(log.isDebugEnabled()) {
+                log.error("Failed to publish transaction count after all retries: " + e.getMessage(), e);
+            }
+        }
     }
 
     public boolean isEnabled() {
@@ -147,16 +173,24 @@ public class TransactionAggregator {
 
     public void shutdown() {
         if (scheduledExecutorService != null) {
+            // Publish final report before shutdown
             publishAndReset();
 
-            scheduledExecutorService.shutdownNow();
+            scheduledExecutorService.shutdown();
             try {
-                if (!scheduledExecutorService.awaitTermination(5, TimeUnit.SECONDS)) {
-                    LOG.warn("TransactionAggregator did not terminate in time");
+                if (!scheduledExecutorService.awaitTermination(
+                        ApimUsageDataCollectorConstants.SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                    scheduledExecutorService.shutdownNow();
+                    if(log.isDebugEnabled()) {
+                        log.warn("TransactionAggregator forced shutdown");
+                    }
                 }
             } catch (InterruptedException e) {
+                scheduledExecutorService.shutdownNow();
                 Thread.currentThread().interrupt();
-                LOG.error("Interrupted while shutting down TransactionAggregator", e);
+                if(log.isDebugEnabled()) {
+                    log.error("Interrupted while shutting down TransactionAggregator", e);
+                }
             }
         }
         enabled = false;

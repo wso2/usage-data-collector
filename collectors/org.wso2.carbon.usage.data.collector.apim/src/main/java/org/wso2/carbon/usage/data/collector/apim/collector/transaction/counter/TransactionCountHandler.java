@@ -22,34 +22,34 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.synapse.AbstractExtendedSynapseHandler;
 import org.apache.synapse.MessageContext;
+import org.wso2.carbon.usage.data.collector.common.publisher.api.Publisher;
 import org.wso2.carbon.usage.data.collector.apim.collector.transaction.aggregator.TransactionAggregator;
-import org.wso2.carbon.usage.data.collector.apim.collector.transaction.publisher.TransactionPublisher;
 
 public class TransactionCountHandler extends AbstractExtendedSynapseHandler {
     private static final Log LOG = LogFactory.getLog(TransactionCountHandler.class);
     private TransactionAggregator transactionAggregator;
-    private TransactionPublisher publisher;
+    private Publisher publisher;
     private volatile boolean enabled = false;
     private static TransactionCountHandler instance;
 
-    public static synchronized void registerTransactionPublisher(TransactionPublisher reporter) {
+    public static synchronized void registerPublisher(Publisher publisher) {
         if (instance == null) {
             instance = new TransactionCountHandler();
         }
-        instance.publisher = reporter;
+        instance.publisher = publisher;
         if (instance.transactionAggregator == null) {
             instance.transactionAggregator = TransactionAggregator.getInstance();
         }
         synchronized (instance.transactionAggregator) {
             if (!instance.transactionAggregator.isEnabled()) {
-                instance.transactionAggregator.init(reporter);
+                instance.transactionAggregator.init(publisher);
             }
         }
         instance.enabled = true;
     }
 
-    public static synchronized void unregisterTransactionPublisher(TransactionPublisher reporter) {
-        if (instance != null && instance.publisher == reporter) {
+    public static synchronized void unregisterPublisher(Publisher publisher) {
+        if (instance != null && instance.publisher == publisher) {
             instance.publisher = null;
         }
     }

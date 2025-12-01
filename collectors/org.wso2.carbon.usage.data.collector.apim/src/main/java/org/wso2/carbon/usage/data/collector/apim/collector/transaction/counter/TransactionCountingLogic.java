@@ -20,6 +20,7 @@ package org.wso2.carbon.usage.data.collector.apim.collector.transaction.counter;
 
 import org.apache.synapse.MessageContext;
 import org.apache.synapse.core.axis2.Axis2MessageContext;
+import org.wso2.carbon.usage.data.collector.apim.internal.ApimUsageDataCollectorConstants;
 
 public class TransactionCountingLogic {
 
@@ -31,19 +32,19 @@ public class TransactionCountingLogic {
             }
             if (axis2MessageContext != null) {
                 // Checking if the message is inbound
-                Object isInbound = messageContext.getProperty(TransactionCounterConstants.IS_INBOUND);
+                Object isInbound = messageContext.getProperty(ApimUsageDataCollectorConstants.IS_INBOUND);
                 if (isInbound instanceof Boolean && (Boolean) isInbound) {
                     return 1;
                 }
 
                 // Setting this property to identify request-response pairs
-                messageContext.setProperty(TransactionCounterConstants.IS_THERE_ASSOCIATED_INCOMING_REQUEST, true);
+                messageContext.setProperty(ApimUsageDataCollectorConstants.IS_THERE_ASSOCIATED_INCOMING_REQUEST, true);
 
                 // Counting message received via an open WebSocket
                 String transport = axis2MessageContext.getIncomingTransportName();
                 if (transport != null &&
-                        (transport.equals(TransactionCounterConstants.TRANSPORT_WS) ||
-                        transport.equals(TransactionCounterConstants.TRANSPORT_WSS))) {
+                        (transport.equals(ApimUsageDataCollectorConstants.TRANSPORT_WS) ||
+                        transport.equals(ApimUsageDataCollectorConstants.TRANSPORT_WSS))) {
                     return 1;
                 }
             }
@@ -56,7 +57,7 @@ public class TransactionCountingLogic {
             return 0;
         }
         Object isThereAnAssociatedIncomingRequest = messageContext.getProperty(
-                TransactionCounterConstants.IS_THERE_ASSOCIATED_INCOMING_REQUEST);
+                ApimUsageDataCollectorConstants.IS_THERE_ASSOCIATED_INCOMING_REQUEST);
 
         // Counting outgoing messages that are not related to any request-response pair
         if (isThereAnAssociatedIncomingRequest == null) {
@@ -77,7 +78,7 @@ public class TransactionCountingLogic {
             return 0;
         }
         Object isThereAnAssociatedIncomingRequest = messageContext.getProperty(
-                TransactionCounterConstants.IS_THERE_ASSOCIATED_INCOMING_REQUEST);
+                ApimUsageDataCollectorConstants.IS_THERE_ASSOCIATED_INCOMING_REQUEST);
 
         // Counting request-response pairs
         if (isThereAnAssociatedIncomingRequest instanceof Boolean) {
