@@ -35,7 +35,7 @@ import java.util.Properties;
  */
 public class AppCredentialsUtil {
 
-    private static final Log log = LogFactory.getLog(AppCredentialsUtil.class);
+    private static final Log LOG = LogFactory.getLog(AppCredentialsUtil.class);
     private static final AppCredentialsUtil instance = new AppCredentialsUtil();
 
     private String appName;
@@ -81,15 +81,17 @@ public class AppCredentialsUtil {
             File configFile = new File(configFilePath);
 
             if (configFile.exists()) {
-                if (log.isDebugEnabled()) {
-                    log.debug(SERVICE_CONFIG_FILE_NAME + " file loaded from " +
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug(SERVICE_CONFIG_FILE_NAME + " file loaded from " +
                             SERVICE_CONFIG_RELATIVE_PATH);
                 }
                 inputStream = new FileInputStream(configFile);
                 properties.load(inputStream);
                 resolveSecrets(properties);
             } else {
-                log.warn("Could not find " + SERVICE_CONFIG_FILE_NAME + " in filesystem");
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Could not find " + SERVICE_CONFIG_FILE_NAME + " in filesystem");
+                }
             }
 
             // Extract app credentials
@@ -100,20 +102,24 @@ public class AppCredentialsUtil {
                 appPassword = appPasswordStr.toCharArray();
             }
 
-            if (log.isDebugEnabled()) {
-                log.debug("App credentials loaded - App Name: " + appName +
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("App credentials loaded - App Name: " + appName +
                         ", Password configured: " + (appPassword != null && appPassword.length > 0));
             }
 
         } catch (IOException e) {
-            log.error("Failed to load app credentials from configuration file", e);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Failed to load app credentials from configuration file", e);
+            }
         } finally {
             if (inputStream != null) {
                 try {
                     inputStream.close();
                 } catch (IOException e) {
-                    log.error("Failed to close the FileInputStream for file: " +
-                            SERVICE_CONFIG_FILE_NAME, e);
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Failed to close the FileInputStream for file: " +
+                                SERVICE_CONFIG_FILE_NAME, e);
+                    }
                 }
             }
         }
@@ -144,7 +150,9 @@ public class AppCredentialsUtil {
                 }
             }
         } catch (Exception e) {
-            log.warn("Error resolving secrets from secure vault: " + e.getMessage());
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Error resolving secrets from secure vault: " + e.getMessage());
+            }
         }
     }
 

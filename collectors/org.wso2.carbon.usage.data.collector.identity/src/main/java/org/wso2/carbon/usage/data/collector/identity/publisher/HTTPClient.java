@@ -78,7 +78,9 @@ public class HTTPClient {
                 }
             }
         } catch (Exception e) {
-            LOG.error("Failed to call " + endpointLabel + " at " + endpoint, e);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Failed to call " + endpointLabel + " at " + endpoint, e);
+            }
             return ApiResponse.failure(500, e.getMessage());
         }
     }
