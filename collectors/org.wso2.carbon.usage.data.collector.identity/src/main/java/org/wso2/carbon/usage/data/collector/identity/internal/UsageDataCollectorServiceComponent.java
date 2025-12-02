@@ -32,6 +32,7 @@ import org.wso2.carbon.core.clustering.api.CoordinatedActivity;
 import org.wso2.carbon.identity.organization.management.service.OrganizationManager;
 import org.wso2.carbon.usage.data.collector.identity.UsageDataCollector;
 import org.wso2.carbon.usage.data.collector.identity.UsageDataCollectorTask;
+import org.wso2.carbon.usage.data.collector.identity.publisher.PublisherImp;
 import org.wso2.carbon.usage.data.collector.identity.util.ClusteringUtil;
 import org.wso2.carbon.user.core.service.RealmService;
 import org.wso2.carbon.utils.ConfigurationContextService;
@@ -81,6 +82,12 @@ public class UsageDataCollectorServiceComponent {
                 LOG.debug("Standalone setup detected. Usage data collectors starts immediately.");
                 runUsageCollectionTask();
             }
+
+            // Register the publisher.
+            bundleContext.registerService(
+                    org.wso2.carbon.usage.data.collector.common.publisher.api.Publisher.class.getName(),
+                    new PublisherImp(),
+                    null);
 
             LOG.debug("UsageDataCollectorServiceComponent activated successfully");
 
