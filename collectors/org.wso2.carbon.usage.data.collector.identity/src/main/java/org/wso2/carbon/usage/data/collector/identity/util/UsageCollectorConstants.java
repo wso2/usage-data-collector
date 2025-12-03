@@ -26,5 +26,7 @@ public class UsageCollectorConstants {
     private UsageCollectorConstants() {}
 
     public static final String USERNAME_CLAIM = "http://wso2.org/claims/username";
+    // Todo: Need to read this value from the license file.
+    public static final String PRODUCT = "wso2is-7.2.0";
 
 }
