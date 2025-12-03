@@ -22,6 +22,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.wso2.carbon.identity.organization.management.service.OrganizationManager;
 import org.wso2.carbon.usage.data.collector.common.publisher.api.model.ApiRequest;
+import org.wso2.carbon.usage.data.collector.common.publisher.api.model.ApiResponse;
 import org.wso2.carbon.usage.data.collector.identity.counter.OrganizationCounter;
 import org.wso2.carbon.usage.data.collector.identity.counter.UserCounter;
 import org.wso2.carbon.usage.data.collector.identity.internal.UsageDataCollectorDataHolder;
@@ -64,7 +65,7 @@ public class UsageDataCollector {
     }
 
     /**
-     * Collect the matrices and publish them.
+     * Collect the metrics and publish them.
      */
     public void collectAndPublish() {
 
@@ -190,10 +191,14 @@ public class UsageDataCollector {
 
         try {
             ApiRequest request = HTTPClient.createUsageDataRequest(count, type);
-            publisher.callReceiverApi(request);
+            ApiResponse response = publisher.callReceiverApi(request);
 
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Published " + type + ": " + count);
+                if (response.isSuccess()) {
+                    LOG.debug("Published " + type + ": " + count);
+                } else {
+                    LOG.debug("Failed to publish " + type + ": " + response.getErrorMessage());
+                }
             }
         } catch (Exception e) {
             if (LOG.isDebugEnabled()) {

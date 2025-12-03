@@ -18,6 +18,8 @@
 
 package org.wso2.carbon.usage.data.collector.identity.publisher;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.wso2.carbon.base.MultitenantConstants;
 import org.wso2.carbon.identity.core.ServiceURLBuilder;
 import org.wso2.carbon.identity.core.URLBuilderException;
@@ -33,6 +35,7 @@ import javax.sql.DataSource;
  */
 public class PublisherImp implements Publisher {
 
+    private static final Log LOG = LogFactory.getLog(PublisherImp.class);
     private static final String RECEIVER_ENDPOINT = "/usage/data/receiver";
     private static final String WSO2_ENDPOINT = "https://api.choreo.dev/test";
 
@@ -45,20 +48,20 @@ public class PublisherImp implements Publisher {
     @Override
     public ApiResponse callReceiverApi(ApiRequest request) throws PublisherException {
 
-        String endpoint = getEndpoint(request, false);
+        String endpoint = getEndpoint(request);
         return new HTTPClient().executeApiRequest(request, endpoint, "receiver API");
     }
 
     @Override
     public ApiResponse callWso2Api(ApiRequest request) throws PublisherException {
 
-        String endpoint = getEndpoint(request, true);
+        String endpoint = getWSO2Endpoint(request);
         return new HTTPClient().executeApiRequest(request, endpoint, "WSO2 API");
     }
 
-    private static String getEndpoint(ApiRequest request, boolean wso2Endpoint) {
+    private static String getEndpoint(ApiRequest request) {
 
-        String endpoint = wso2Endpoint ? WSO2_ENDPOINT : getReceiverEndpoint();
+        String endpoint = getReceiverEndpoint();
         if (request.getData() instanceof UsageCount) {
             endpoint += "/usage-counts";
         } else if (request.getData() instanceof DeploymentInformation) {
@@ -80,7 +83,19 @@ public class PublisherImp implements Publisher {
                     .build()
                     .getAbsoluteInternalURL();
         } catch (URLBuilderException e) {
-            throw new RuntimeException(e);
+           if(LOG.isDebugEnabled()) {
+               LOG.debug(e.getMessage(), e);
+           }
+           return "";
         }
+    }
+
+    private static String getWSO2Endpoint(ApiRequest request) {
+
+        String endpoint = WSO2_ENDPOINT;
+        if (request.getEndpoint() != null && !request.getEndpoint().isEmpty()) {
+            endpoint = request.getEndpoint();
+        }
+        return endpoint;
     }
 }

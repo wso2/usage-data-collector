@@ -30,7 +30,6 @@ import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.hc.core5.util.Timeout;
-import org.wso2.carbon.usage.data.collector.common.publisher.api.PublisherException;
 import org.wso2.carbon.usage.data.collector.common.publisher.api.model.ApiRequest;
 import org.wso2.carbon.usage.data.collector.common.publisher.api.model.ApiResponse;
 import org.wso2.carbon.usage.data.collector.common.publisher.api.model.UsageCount;
@@ -38,7 +37,6 @@ import org.wso2.carbon.usage.data.collector.common.util.UsageDataUtil;
 import org.wso2.carbon.usage.data.collector.identity.util.AppCredentialsUtil;
 import org.wso2.carbon.utils.httpclient5.HTTPClientUtils;
 
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
 import static org.wso2.carbon.usage.data.collector.identity.util.UsageCollectorConstants.PRODUCT;
@@ -91,7 +89,6 @@ public class HTTPClient {
      * @param count The count value
      * @param type  The type of usage data
      * @return ApiRequest object
-     * @throws PublisherException if creation fails
      */
     public static ApiRequest createUsageDataRequest(int count, String type) {
 
@@ -124,10 +121,10 @@ public class HTTPClient {
             return;
         }
         String appName = credentialsUtil.getAppName();
-        String appPassword = String.valueOf(credentialsUtil.getAppPassword());
-        String toEncode = appName + ":" + appPassword;
+        char[] appPasswordChars = credentialsUtil.getAppPassword();
+        String toEncode = appName + ":" + new String(appPasswordChars);
         byte[] encoding = Base64.encodeBase64(toEncode.getBytes());
-        String authHeader = new String(encoding, Charset.defaultCharset());
+        String authHeader = new String(encoding, StandardCharsets.UTF_8);
         String CLIENT = "Client ";
         httpMethod.addHeader(HTTPConstants.HEADER_AUTHORIZATION, CLIENT + authHeader);
     }

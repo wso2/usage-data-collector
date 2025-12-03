@@ -18,9 +18,9 @@
 
 package org.wso2.carbon.usage.data.collector.identity.util;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.commons.lang.StringUtils;
 import org.wso2.securevault.SecretResolver;
 import org.wso2.securevault.SecretResolverFactory;
 
@@ -52,7 +52,8 @@ public class AppCredentialsUtil {
     private static final String SECRET_PROVIDER = "secretProvider";
 
     private AppCredentialsUtil() {
-        // Private constructor for singleton
+
+        init();
     }
 
     /**
@@ -62,7 +63,6 @@ public class AppCredentialsUtil {
      */
     public static AppCredentialsUtil getInstance() {
 
-        instance.init();
         return instance;
     }
 
@@ -92,6 +92,7 @@ public class AppCredentialsUtil {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Could not find " + SERVICE_CONFIG_FILE_NAME + " in filesystem");
                 }
+                return;
             }
 
             // Extract app credentials

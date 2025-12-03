@@ -21,6 +21,7 @@ package org.wso2.carbon.usage.data.collector.identity.internal;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.osgi.framework.BundleContext;
+import org.osgi.framework.ServiceRegistration;
 import org.osgi.service.component.ComponentContext;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
@@ -63,6 +64,7 @@ public class UsageDataCollectorServiceComponent {
     private ScheduledExecutorService scheduler;
     private ScheduledFuture<?> scheduledTask;
     private BundleContext bundleContext;
+    private ServiceRegistration<?> publisherServiceRegistration;
 
     @Activate
     protected void activate(ComponentContext context) {
@@ -84,7 +86,7 @@ public class UsageDataCollectorServiceComponent {
             }
 
             // Register the publisher.
-            bundleContext.registerService(
+            publisherServiceRegistration = bundleContext.registerService(
                     org.wso2.carbon.usage.data.collector.common.publisher.api.Publisher.class.getName(),
                     new PublisherImp(),
                     null);
@@ -121,6 +123,14 @@ public class UsageDataCollectorServiceComponent {
             } catch (InterruptedException e) {
                 scheduler.shutdownNow();
                 Thread.currentThread().interrupt();
+            }
+        }
+
+        if (publisherServiceRegistration != null) {
+            try {
+                publisherServiceRegistration.unregister();
+            } catch (IllegalStateException e) {
+                // Service already unregistered
             }
         }
     }
