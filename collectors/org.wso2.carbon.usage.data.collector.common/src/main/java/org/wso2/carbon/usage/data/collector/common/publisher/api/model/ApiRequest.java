@@ -128,7 +128,7 @@ public class ApiRequest {
 
         public ApiRequest build() {
             if (data == null) {
-                throw new IllegalArgumentException("UsageData cannot be null");
+                throw new IllegalArgumentException("Request data cannot be null");
             }
             return new ApiRequest(this);
         }
