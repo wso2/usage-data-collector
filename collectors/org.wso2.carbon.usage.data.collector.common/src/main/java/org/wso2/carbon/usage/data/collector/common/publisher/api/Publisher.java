@@ -39,14 +39,15 @@ import javax.sql.DataSource;
  *
  * <h3>Usage Pattern:</h3>
  * <ul>
- *   <li><b>Collectors should use:</b> {@code publishToReceiver()} or {@code publishToWso2()} - High-level methods with retry logic</li>
- *   <li><b>Implementations should override:</b> {@code callReceiverApi()} or {@code callWso2Api()} - Low-level HTTP methods</li>
+ *   <li><b>Collectors should use:</b> {@code publishToReceiver()} for receiver API calls with retry logic</li>
+ *   <li><b>Collectors should use:</b> {@code callExternalApi()} for external API calls (e.g., Choreo, OAuth) without automatic retry</li>
+ *   <li><b>Implementations should override:</b> {@code callReceiverApi()} and {@code callExternalApi()} - Low-level HTTP methods</li>
  * </ul>
  */
 public interface Publisher {
 
     int MAX_RETRIES = 3;
-    int RETRY_DELAY_MS = 15000;
+    int RETRY_DELAY_MS = 1000;
     Log log = LogFactory.getLog(Publisher.class);
 
     /**
@@ -83,25 +84,6 @@ public interface Publisher {
         return executeWithRetry(() -> callReceiverApi(request), "publishToReceiver");
     }
 
-    /**
-     * Publishes data to the WSO2 API with automatic retry logic.
-     * This is the HIGH-LEVEL method that collectors should use.
-     *
-     * <p>Retry behavior:</p>
-     * <ul>
-     *   <li>Retries up to {@value #MAX_RETRIES} times</li>
-     *   <li>Exponential backoff: 1s, 2s, 3s between retries</li>
-     *   <li>Returns on first successful response (2xx status code)</li>
-     *   <li>Throws exception if all retries fail</li>
-     * </ul>
-     *
-     * @param request The API request containing data and parameters
-     * @return ApiResponse with successful status code and body
-     * @throws PublisherException If all retry attempts fail
-     */
-    default ApiResponse publishToWso2(ApiRequest request) throws PublisherException {
-        return executeWithRetry(() -> callWso2Api(request), "publishToWso2");
-    }
 
     /**
      * Internal retry logic shared by both publish methods.
@@ -228,24 +210,31 @@ public interface Publisher {
     ApiResponse callReceiverApi(ApiRequest request) throws PublisherException;
 
     /**
-     * Sends HTTP request to WSO2 API WITHOUT retry logic.
+     * Sends HTTP request to external API WITHOUT retry logic.
      * This is a LOW-LEVEL method that implementations must override.
-     * Collectors should NOT call this directly - use {@link #publishToWso2(ApiRequest)} instead.
+     * Use this for external API calls like Choreo API, OAuth token endpoints, etc.
      *
      * <p><b>Implementation Guidelines:</b></p>
      * <ul>
      *   <li>Just send the HTTP request and return the response</li>
      *   <li>Return both success and failure responses</li>
-     *   <li>Do NOT implement retry logic here</li>
+     *   <li>Do NOT implement retry logic here - caller handles retries if needed</li>
      *   <li>Do NOT validate status codes here</li>
      *   <li>Throw PublisherException only for network errors or configuration issues</li>
      * </ul>
      *
-     * @param request The API request containing data and parameters
+     * <p><b>Common Use Cases:</b></p>
+     * <ul>
+     *   <li>Calling Choreo API to publish usage data</li>
+     *   <li>Getting OAuth access tokens</li>
+     *   <li>Any other external HTTP API calls</li>
+     * </ul>
+     *
+     * @param request The API request containing data and parameters (including endpoint)
      * @return ApiResponse containing status code and body (both success and failure responses)
      * @throws PublisherException If the request cannot be sent (e.g., network error, configuration issue)
      */
-    ApiResponse callWso2Api(ApiRequest request) throws PublisherException;
+    ApiResponse callExternalApi(ApiRequest request) throws PublisherException;
 
     /**
      * Functional interface for operations that can be retried.

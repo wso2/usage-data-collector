@@ -32,6 +32,7 @@ import org.wso2.carbon.usage.data.collector.common.collector.DeploymentDataColle
 import org.wso2.carbon.usage.data.collector.common.collector.MetaInformationPublisher;
 import org.wso2.carbon.usage.data.collector.common.publisher.api.Publisher;
 
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -89,10 +90,22 @@ public class UsageDataCollectorServiceComponent {
                 return;
             }
 
-            // Publish MetaInformation to /meta-information endpoint at startup
-            // This also initializes the MetaInfoHolder cache for use in all payloads
-            MetaInformationPublisher metaInfoPublisher = new MetaInformationPublisher(publisher);
-            metaInfoPublisher.publishAtStartup();
+            // Publish MetaInformation asynchronously to avoid blocking server startup
+            // This prevents HTTP retries from delaying server availability
+            CompletableFuture.runAsync(() -> {
+                try {
+                    MetaInformationPublisher metaInfoPublisher = new MetaInformationPublisher(publisher);
+                    metaInfoPublisher.publishAtStartup();
+                    if (log.isDebugEnabled()) {
+                        log.debug("Meta information published successfully in background");
+                    }
+                } catch (Exception e) {
+                    if(log.isDebugEnabled()) {
+                        log.error("Failed to publish meta information at startup (non-fatal)", e);
+                    }
+                    // Non-fatal - server continues to start, meta info will be in payloads anyway
+                }
+            });
 
             // Create deployment data collector with publisher
             // Note: Meta information is included in every payload using cached values from MetaInfoHolder
