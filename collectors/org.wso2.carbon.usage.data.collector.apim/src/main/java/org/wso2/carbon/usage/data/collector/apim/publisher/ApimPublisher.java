@@ -271,9 +271,9 @@ public class ApimPublisher implements Publisher {
     }
 
     /**
-     * Sets the request entity based on the Content-Type header. Supports application/json and
-     * application/x-www-form-urlencoded. Handles different data types: Map, objects with data field, or any
-     * JSON-serializable object.
+     * Sets the request entity based on the Content-Type header.
+     * Supports application/json and application/x-www-form-urlencoded.
+     * Handles UsageData subclasses (DeploymentInformation, MetaInformation, UsageCount) and Map objects.
      *
      * @param httpPost HttpPost request to set the entity on
      * @param request  ApiRequest containing the data and headers
@@ -282,15 +282,19 @@ public class ApimPublisher implements Publisher {
     private void setRequestEntity(HttpPost httpPost, ApiRequest request) throws UnsupportedEncodingException {
         String contentType = getContentType(request);
         Object data = request.getData();
-        Map<String, Object> dataFields = (Map<String, Object>) data;
+
+        Gson gson = new GsonBuilder().create();
 
         if (contentType.contains("application/json")) {
-            // Create JSON entity
-            Gson gson = new GsonBuilder().create();
-            String jsonPayload = gson.toJson(dataFields);
+            // Create JSON entity - Gson handles all object types
+            String jsonPayload = gson.toJson(data);
             httpPost.setEntity(new StringEntity(jsonPayload, ContentType.APPLICATION_JSON));
         } else if (contentType.contains("application/x-www-form-urlencoded")) {
             // Create URL-encoded form entity
+            Map<String, Object> dataFields = (data instanceof Map)
+                    ? (Map<String, Object>) data
+                    : gson.fromJson(gson.toJson(data), Map.class);
+
             List<NameValuePair> params = new ArrayList<>();
             for (Map.Entry<String, Object> entry : dataFields.entrySet()) {
                 params.add(new BasicNameValuePair(entry.getKey(), String.valueOf(entry.getValue())));
@@ -298,8 +302,7 @@ public class ApimPublisher implements Publisher {
             httpPost.setEntity(new UrlEncodedFormEntity(params, "UTF-8"));
         } else {
             // Default to JSON if content type is not recognized
-            Gson gson = new GsonBuilder().create();
-            String jsonPayload = gson.toJson(dataFields);
+            String jsonPayload = gson.toJson(data);
             httpPost.setEntity(new StringEntity(jsonPayload, ContentType.APPLICATION_JSON));
         }
     }
