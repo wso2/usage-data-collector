@@ -69,17 +69,23 @@ public class ApiCountCollector {
             return;
         }
 
+        // Query and publish non-MCP API count independently
         try {
-            // Query and publish non-MCP API count
             long apiCount = queryApiCount();
             publishApiCount(apiCount, ApimUsageDataCollectorConstants.API_COUNT_TYPE);
+        } catch (Exception e) {
+            if(log.isDebugEnabled()) {
+                log.error("Error collecting and publishing API count (non-MCP)", e);
+            }
+        }
 
-            // Query and publish MCP API count
+        // Query and publish MCP API count independently
+        try {
             long mcpApiCount = queryMcpApiCount();
             publishApiCount(mcpApiCount, ApimUsageDataCollectorConstants.MCP_API_COUNT_TYPE);
         } catch (Exception e) {
             if(log.isDebugEnabled()) {
-                log.error("Error collecting and publishing API count", e);
+                log.error("Error collecting and publishing MCP API count", e);
             }
         }
     }

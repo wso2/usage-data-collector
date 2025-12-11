@@ -42,7 +42,7 @@ public class TransactionAggregator {
     private Publisher publisher;
     private ScheduledExecutorService scheduledExecutorService;
     private long currentHourStartTime;
-    private boolean enabled = false;
+    private volatile boolean enabled = false;
 
     private TransactionAggregator() {}
 

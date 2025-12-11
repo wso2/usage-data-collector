@@ -55,9 +55,8 @@ public class ApimUsageDataCollectorServiceComponent {
     private static final Log log = LogFactory.getLog(ApimUsageDataCollectorServiceComponent.class);
 
     // Configuration for API count collector scheduler
-    private static final long API_COUNT_INITIAL_DELAY_SECONDS = 60;
+    private static final long API_COUNT_INITIAL_DELAY_SECONDS = 600;
     private static final long API_COUNT_INTERVAL_SECONDS = 3600; // 1 hour default
-    private static final String API_COUNT_INTERVAL_PROPERTY = "apim.api.count.interval.hours";
 
     private Publisher publisher;
     private ScheduledExecutorService apiCountExecutorService;

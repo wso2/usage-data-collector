@@ -26,43 +26,54 @@ import org.wso2.carbon.usage.data.collector.common.publisher.api.Publisher;
 import org.wso2.carbon.usage.data.collector.apim.collector.transaction.aggregator.TransactionAggregator;
 
 public class TransactionCountHandler extends AbstractExtendedSynapseHandler {
-    private static final Log LOG = LogFactory.getLog(TransactionCountHandler.class);
-    private TransactionAggregator transactionAggregator;
-    private Publisher publisher;
-    private volatile boolean enabled = false;
-    private static TransactionCountHandler instance;
+    private static final Log log = LogFactory.getLog(TransactionCountHandler.class);
 
-    public static synchronized void registerPublisher(Publisher publisher) {
-        if (instance == null) {
-            instance = new TransactionCountHandler();
+    // Static singleton fields - all state is static for consistent singleton behavior
+    private static volatile TransactionAggregator transactionAggregator;
+    private static volatile Publisher publisher;
+    private static volatile boolean enabled = false;
+    private static final Object LOCK = new Object();
+
+    /**
+     * Register the Publisher and initialize the TransactionAggregator.
+     * Called by the OSGi service component when Publisher becomes available.
+     */
+    public static void registerPublisher(Publisher newPublisher) {
+        synchronized (LOCK) {
+            publisher = newPublisher;
+
+            if (transactionAggregator == null) {
+                transactionAggregator = TransactionAggregator.getInstance();
+            }
+
+            // Initialize aggregator if not already initialized
+            if (!transactionAggregator.isEnabled()) {
+                transactionAggregator.init(newPublisher);
+            }
+
+            enabled = true;
         }
-        instance.publisher = publisher;
-        if (instance.transactionAggregator == null) {
-            instance.transactionAggregator = TransactionAggregator.getInstance();
-        }
-        synchronized (instance.transactionAggregator) {
-            if (!instance.transactionAggregator.isEnabled()) {
-                instance.transactionAggregator.init(publisher);
+    }
+
+    /**
+     * Unregister the Publisher and disable transaction counting.
+     * Called by the OSGi service component when Publisher is unbound.
+     */
+    public static void unregisterPublisher(Publisher oldPublisher) {
+        synchronized (LOCK) {
+            if (publisher == oldPublisher) {
+                enabled = false;
+                publisher = null;
             }
         }
-        instance.enabled = true;
     }
 
-    public static synchronized void unregisterPublisher(Publisher publisher) {
-        if (instance != null && instance.publisher == publisher) {
-            instance.publisher = null;
-        }
-    }
-
+    /**
+     * Public constructor for Synapse handler instantiation.
+     * All state is static, so multiple instances share the same singleton state.
+     */
     public TransactionCountHandler() {
-        try {
-            if (instance == null || instance.transactionAggregator == null) {
-                instance = this;
-            }
-        } catch (Exception e) {
-            LOG.error("TransactionCountHandler: Error in constructor", e);
-            this.enabled = false;
-        }
+        // No initialization needed - all state is static
     }
 
     @Override
@@ -73,13 +84,13 @@ public class TransactionCountHandler extends AbstractExtendedSynapseHandler {
 
     @Override
     public boolean handleRequestInFlow(MessageContext messageContext) {
-        if (instance == null || !instance.enabled) {
+        if (!enabled) {
             return true;
         }
         int tCount = TransactionCountingLogic.handleRequestInFlow(messageContext);
-        if(tCount > 0) {
-            if (instance.transactionAggregator != null && instance.transactionAggregator.isEnabled()) {
-                instance.transactionAggregator.addTransactions(tCount);
+        if (tCount > 0) {
+            if (transactionAggregator != null && transactionAggregator.isEnabled()) {
+                transactionAggregator.addTransactions(tCount);
             }
         }
         return true;
@@ -87,26 +98,22 @@ public class TransactionCountHandler extends AbstractExtendedSynapseHandler {
 
     @Override
     public boolean handleServerShutDown() {
-        LOG.debug("Shutting down Transaction Counter...");
-
-        // Clean up resources
+        // Clean up resources using static fields
         if (transactionAggregator != null && transactionAggregator.isEnabled()) {
             transactionAggregator.shutdown();
         }
-
-        LOG.debug("Transaction Counter shutdown completed");
         return true;
     }
 
     @Override
     public boolean handleRequestOutFlow(MessageContext messageContext) {
-        if (instance == null || !instance.enabled) {
+        if (!enabled) {
             return true;
         }
         int tCount = TransactionCountingLogic.handleRequestOutFlow(messageContext);
-        if(tCount > 0) {
-            if (instance.transactionAggregator != null && instance.transactionAggregator.isEnabled()) {
-                instance.transactionAggregator.addTransactions(tCount);
+        if (tCount > 0) {
+            if (transactionAggregator != null && transactionAggregator.isEnabled()) {
+                transactionAggregator.addTransactions(tCount);
             }
         }
         return true;
@@ -114,13 +121,13 @@ public class TransactionCountHandler extends AbstractExtendedSynapseHandler {
 
     @Override
     public boolean handleResponseInFlow(MessageContext messageContext) {
-        if (instance == null || !instance.enabled) {
+        if (!enabled) {
             return true;
         }
         int tCount = TransactionCountingLogic.handleResponseInFlow(messageContext);
-        if(tCount > 0) {
-            if (instance.transactionAggregator != null && instance.transactionAggregator.isEnabled()) {
-                instance.transactionAggregator.addTransactions(tCount);
+        if (tCount > 0) {
+            if (transactionAggregator != null && transactionAggregator.isEnabled()) {
+                transactionAggregator.addTransactions(tCount);
             }
         }
         return true;
@@ -128,13 +135,13 @@ public class TransactionCountHandler extends AbstractExtendedSynapseHandler {
 
     @Override
     public boolean handleResponseOutFlow(MessageContext messageContext) {
-        if (instance == null || !instance.enabled) {
+        if (!enabled) {
             return true;
         }
         int tCount = TransactionCountingLogic.handleResponseOutFlow(messageContext);
-        if(tCount > 0) {
-            if (instance.transactionAggregator != null && instance.transactionAggregator.isEnabled()) {
-                instance.transactionAggregator.addTransactions(tCount);
+        if (tCount > 0) {
+            if (transactionAggregator != null && transactionAggregator.isEnabled()) {
+                transactionAggregator.addTransactions(tCount);
             }
         }
         return true;

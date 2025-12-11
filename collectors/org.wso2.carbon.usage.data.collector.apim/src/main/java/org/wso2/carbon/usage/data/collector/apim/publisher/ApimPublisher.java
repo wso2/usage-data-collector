@@ -33,7 +33,6 @@ import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicNameValuePair;
-import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.http.util.EntityUtils;
 import org.jetbrains.annotations.NotNull;
 import org.osgi.service.component.annotations.Component;
@@ -206,7 +205,7 @@ public class ApimPublisher implements Publisher {
 
         // Use APIUtil.getHttpClient() - consistent with APIM codebase
         // Cast to CloseableHttpClient for proper resource management
-        CloseableHttpClient httpClient = null;
+        CloseableHttpClient httpClient;
         try {
             httpClient = (CloseableHttpClient) APIUtil.getHttpClient(url);
         } catch (APIManagementException e) {
@@ -236,37 +235,6 @@ public class ApimPublisher implements Publisher {
             }
 
             return response;
-        }
-    }
-
-    /**
-     * Creates a CloseableHttpClient with SSL support and timeout configuration. Configured to trust all certificates
-     * (for testing/development).
-     *
-     * @return CloseableHttpClient instance
-     * @throws PublisherException if client creation fails
-     */
-    private CloseableHttpClient createHttpClient() throws PublisherException {
-        try {
-            // Create SSL context that trusts all certificates
-            SSLContext sslContext = SSLContextBuilder.create()
-                    .loadTrustMaterial((chain, authType) -> true)  // Trust all certificates
-                    .build();
-
-            // Create SSL socket factory
-            SSLConnectionSocketFactory sslSocketFactory = new SSLConnectionSocketFactory(sslContext);
-
-            // Configure request timeouts
-            RequestConfig requestConfig = RequestConfig.custom().setConnectTimeout(DEFAULT_CONNECT_TIMEOUT_MS)
-                    .setSocketTimeout(DEFAULT_SOCKET_TIMEOUT_MS).setConnectionRequestTimeout(DEFAULT_CONNECT_TIMEOUT_MS)
-                    .build();
-
-            // Build and return HttpClient
-            return HttpClients.custom().setSSLSocketFactory(sslSocketFactory).setDefaultRequestConfig(requestConfig)
-                    .build();
-
-        } catch (NoSuchAlgorithmException | KeyManagementException | KeyStoreException e) {
-            throw new PublisherException("Failed to create HTTP client with SSL support", e);
         }
     }
 

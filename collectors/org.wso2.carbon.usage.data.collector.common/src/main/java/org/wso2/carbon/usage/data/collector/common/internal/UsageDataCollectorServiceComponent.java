@@ -32,7 +32,6 @@ import org.wso2.carbon.usage.data.collector.common.collector.DeploymentDataColle
 import org.wso2.carbon.usage.data.collector.common.collector.MetaInformationPublisher;
 import org.wso2.carbon.usage.data.collector.common.publisher.api.Publisher;
 
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -52,11 +51,13 @@ public class UsageDataCollectorServiceComponent {
     private static final Log log = LogFactory.getLog(UsageDataCollectorServiceComponent.class);
 
     // Hardcoded configuration for scheduler
-    private static final long INITIAL_DELAY_SECONDS = 60;
+    private static final long INITIAL_DELAY_SECONDS = 600;
     private static final long INTERVAL_SECONDS = 3600;
+    private static final long META_INFO_PUBLISH_DELAY_SECONDS = 300; // 5 minutes
 
     private ScheduledExecutorService executorService;
     private ScheduledFuture<?> scheduledTask;
+    private ScheduledFuture<?> metaInfoPublishTask;
     private Publisher publisher;
 
     /**
@@ -90,14 +91,25 @@ public class UsageDataCollectorServiceComponent {
                 return;
             }
 
-            // Publish MetaInformation asynchronously to avoid blocking server startup
-            // This prevents HTTP retries from delaying server availability
-            CompletableFuture.runAsync(() -> {
+            // Initialize scheduler for both meta information publishing and deployment data collection
+            executorService = Executors.newScheduledThreadPool(2, new ThreadFactory() {
+                private int counter = 0;
+                @Override
+                public Thread newThread(Runnable r) {
+                    Thread thread = new Thread(r, "UsageDataCollector-Thread-" + (++counter));
+                    thread.setDaemon(true);
+                    return thread;
+                }
+            });
+
+            // Schedule meta information publishing after 5 minutes (one-time task)
+            // This prevents HTTP retries from delaying server availability and allows system to stabilize
+            metaInfoPublishTask = executorService.schedule(() -> {
                 try {
                     MetaInformationPublisher metaInfoPublisher = new MetaInformationPublisher(publisher);
                     metaInfoPublisher.publishAtStartup();
                     if (log.isDebugEnabled()) {
-                        log.debug("Meta information published successfully in background");
+                        log.debug("Meta information published successfully after 5 minute delay");
                     }
                 } catch (Exception e) {
                     if(log.isDebugEnabled()) {
@@ -105,21 +117,12 @@ public class UsageDataCollectorServiceComponent {
                     }
                     // Non-fatal - server continues to start, meta info will be in payloads anyway
                 }
-            });
+            }, META_INFO_PUBLISH_DELAY_SECONDS, TimeUnit.SECONDS);
 
             // Create deployment data collector with publisher
             // Note: Meta information is included in every payload using cached values from MetaInfoHolder
             DeploymentDataCollector collector = new DeploymentDataCollector(publisher);
 
-            // Initialize scheduler
-            executorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
-                @Override
-                public Thread newThread(Runnable r) {
-                    Thread thread = new Thread(r, "UsageDataCollector-Thread");
-                    thread.setDaemon(true);
-                    return thread;
-                }
-            });
 
             // Schedule the task
             scheduledTask = executorService.scheduleAtFixedRate(
@@ -137,7 +140,11 @@ public class UsageDataCollectorServiceComponent {
 
     @Deactivate
     protected void deactivate(ComponentContext context) {
-        // Stop the scheduler
+        // Stop the schedulers
+        if (metaInfoPublishTask != null) {
+            metaInfoPublishTask.cancel(false);
+        }
+
         if (scheduledTask != null) {
             scheduledTask.cancel(false);
         }
