@@ -26,6 +26,7 @@ import org.wso2.carbon.usage.data.collector.common.publisher.api.Publisher;
 import org.wso2.carbon.usage.data.collector.apim.collector.transaction.aggregator.TransactionAggregator;
 
 public class TransactionCountHandler extends AbstractExtendedSynapseHandler {
+
     private static final Log log = LogFactory.getLog(TransactionCountHandler.class);
 
     // Static singleton fields - all state is static for consistent singleton behavior

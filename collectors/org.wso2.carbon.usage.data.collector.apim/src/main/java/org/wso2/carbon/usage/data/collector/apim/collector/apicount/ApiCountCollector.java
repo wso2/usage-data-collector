@@ -45,7 +45,6 @@ public class ApiCountCollector {
 
     private static final Log log = LogFactory.getLog(ApiCountCollector.class);
 
-
     private final Publisher publisher;
 
     /**
