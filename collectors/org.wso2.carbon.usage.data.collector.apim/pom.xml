@@ -147,7 +147,7 @@
         </plugins>
     </build>
     <properties>
-        <synapse.version.range>2.1.7-wso2v183</synapse.version.range>
+        <synapse.version>2.1.7-wso2v183</synapse.version>
         <synapse.version.range>[2.0.0,5.0.0)</synapse.version.range>
         <axis2.version>[1.6.1,2.0.0)</axis2.version>
         <apimgt.version>6.7.206</apimgt.version>
