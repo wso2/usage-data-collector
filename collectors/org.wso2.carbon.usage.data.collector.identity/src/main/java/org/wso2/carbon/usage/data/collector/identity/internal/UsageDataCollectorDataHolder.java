@@ -19,6 +19,7 @@
 package org.wso2.carbon.usage.data.collector.identity.internal;
 
 import org.wso2.carbon.identity.organization.management.service.OrganizationManager;
+import org.wso2.carbon.usage.data.collector.common.receiver.Receiver;
 import org.wso2.carbon.user.core.service.RealmService;
 import org.wso2.carbon.utils.ConfigurationContextService;
 
@@ -32,6 +33,17 @@ public class UsageDataCollectorDataHolder {
     private OrganizationManager organizationManager;
     private RealmService realmService;
     private ConfigurationContextService configContextService;
+    private Receiver receiver;
+
+    public Receiver getReceiver() {
+
+        return receiver;
+    }
+
+    public void setReceiver(Receiver receiver) {
+
+        this.receiver = receiver;
+    }
 
     public static UsageDataCollectorDataHolder getInstance() {
 

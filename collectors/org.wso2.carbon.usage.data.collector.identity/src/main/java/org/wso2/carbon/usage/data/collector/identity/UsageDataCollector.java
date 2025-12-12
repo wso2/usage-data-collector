@@ -22,20 +22,18 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.wso2.carbon.identity.organization.management.service.OrganizationManager;
 import org.wso2.carbon.usage.data.collector.common.publisher.api.model.ApiRequest;
-import org.wso2.carbon.usage.data.collector.common.publisher.api.model.ApiResponse;
+import org.wso2.carbon.usage.data.collector.common.publisher.api.model.UsageCount;
+import org.wso2.carbon.usage.data.collector.common.util.MetaInfoHolder;
 import org.wso2.carbon.usage.data.collector.identity.counter.OrganizationCounter;
 import org.wso2.carbon.usage.data.collector.identity.counter.UserCounter;
 import org.wso2.carbon.usage.data.collector.identity.internal.UsageDataCollectorDataHolder;
 import org.wso2.carbon.usage.data.collector.identity.model.SystemUsage;
 import org.wso2.carbon.usage.data.collector.identity.model.TenantUsage;
-import org.wso2.carbon.usage.data.collector.identity.publisher.HTTPClient;
 import org.wso2.carbon.usage.data.collector.identity.publisher.PublisherImp;
 import org.wso2.carbon.user.api.Tenant;
 import org.wso2.carbon.user.core.service.RealmService;
 import org.wso2.carbon.user.core.tenant.TenantManager;
 
-import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -73,7 +71,6 @@ public class UsageDataCollector {
 
         SystemUsage report = this.collectSystemStatistics();
         publishUsageMetrics(report);
-        publish(report);
     }
 
     /**
@@ -83,11 +80,6 @@ public class UsageDataCollector {
 
         SystemUsage usage = new SystemUsage();
 
-        long startTime = System.currentTimeMillis();
-        LOG.info("========== Starting System Statistics Collection ==========");
-        LOG.info("Start Time (UTC): " +
-                ZonedDateTime.now(ZoneOffset.UTC).format(
-                        java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         try {
             TenantManager tenantManager = realmService.getTenantManager();
             Tenant[] tenants = tenantManager.getAllTenants();
@@ -142,34 +134,7 @@ public class UsageDataCollector {
             }
         }
 
-        // End time and duration
-        long endTime = System.currentTimeMillis();
-        long duration = endTime - startTime;
-
-        LOG.info("========== Collection Completed ==========");
-        LOG.info("End Time (UTC): " +
-                ZonedDateTime.now(ZoneOffset.UTC).format(
-                        java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-        LOG.info(String.format("Total Duration: %s", formatDuration(duration)));
-        LOG.info(String.format("Total Duration in milli-seconds: %s", duration));
-        LOG.info(String.format("Results - Root Tenants: %d | B2B Orgs: %d | Users: %d",
-                usage.getRootTenantCount(), usage.getTotalB2BOrganizations(), usage.getTotalUsers()));
-
         return usage;
-    }
-
-    private String formatDuration(long millis) {
-        long seconds = millis / 1000;
-        long minutes = seconds / 60;
-        long hours = minutes / 60;
-
-        if (hours > 0) {
-            return String.format("%dh %dm %ds", hours, minutes % 60, seconds % 60);
-        } else if (minutes > 0) {
-            return String.format("%dm %ds", minutes, seconds % 60);
-        } else {
-            return String.format("%ds", seconds);
-        }
     }
 
     /**
@@ -195,25 +160,6 @@ public class UsageDataCollector {
         return stats;
     }
 
-    // Todo: Need to remove this logic after implementing publisher.
-    private void publish(SystemUsage report) {
-
-        if (report == null) {
-            LOG.warn("No statistics report available");
-            return;
-        }
-
-        LOG.info("\n" +
-                "╔════════════════════════════════════════════════════════════╗\n" +
-                "║           USAGE STATISTICS REPORT                          ║\n" +
-                "╠════════════════════════════════════════════════════════════╣\n" +
-                String.format("║ Root Tenant Count:        %-28d ║\n", report.getRootTenantCount()) +
-                String.format("║ Total B2B Organizations:  %-28d ║\n", report.getTotalB2BOrganizations()) +
-                String.format("║ Total Users:              %-28d ║\n", report.getTotalUsers()) +
-                "╚════════════════════════════════════════════════════════════╝"
-        );
-    }
-
     private void publishUsageMetrics(SystemUsage report) {
 
         publishMetric(report.getTotalUsers(), TOTAL_USERS);
@@ -223,21 +169,13 @@ public class UsageDataCollector {
 
     private void publishMetric(int count, String type) {
 
-        try {
-            ApiRequest request = HTTPClient.createUsageDataRequest(count, type);
-            ApiResponse response = publisher.callReceiverApi(request);
-
-            if (LOG.isDebugEnabled()) {
-                if (response.isSuccess()) {
-                    LOG.debug("Published " + type + ": " + count);
-                } else {
-                    LOG.debug("Failed to publish " + type + ": " + response.getErrorMessage());
-                }
-            }
-        } catch (Exception e) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Failed to publish " + type, e);
-            }
-        }
+        String nodeId = MetaInfoHolder.getNodeId();
+        String product = MetaInfoHolder.getProduct();
+        UsageCount data = new UsageCount(nodeId, product, count, type);
+        ApiRequest request =  new ApiRequest.Builder()
+                .withEndpoint("usage-counts")
+                .withData(data)
+                .build();
+        publisher.callReceiverApi(request);
     }
 }

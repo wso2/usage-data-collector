@@ -182,11 +182,30 @@ public class UsageDataCollectorServiceComponent {
             unbind = "unsetConfigurationContextService"
     )
     protected void setConfigurationContextService(ConfigurationContextService configContextService) {
+
         UsageDataCollectorDataHolder.getInstance().setConfigurationContextService(configContextService);
     }
 
     protected void unsetConfigurationContextService(ConfigurationContextService configContextService) {
+
         UsageDataCollectorDataHolder.getInstance().setConfigurationContextService(null);
+    }
+
+    @Reference(
+            name = "receiver",
+            service = org.wso2.carbon.usage.data.collector.common.receiver.Receiver.class,
+            cardinality = ReferenceCardinality.MANDATORY,
+            policy = ReferencePolicy.DYNAMIC,
+            unbind = "unsetReceiver"
+    )
+    protected void setReceiver(org.wso2.carbon.usage.data.collector.common.receiver.Receiver receiver) {
+
+        UsageDataCollectorDataHolder.getInstance().setReceiver(receiver);
+    }
+
+    protected void unsetReceiver(org.wso2.carbon.usage.data.collector.common.receiver.Receiver receiver) {
+
+        UsageDataCollectorDataHolder.getInstance().setReceiver(null);
     }
 
     /**
