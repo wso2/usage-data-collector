@@ -33,13 +33,12 @@ import org.apache.hc.core5.util.Timeout;
 import org.wso2.carbon.usage.data.collector.common.publisher.api.model.ApiRequest;
 import org.wso2.carbon.usage.data.collector.common.publisher.api.model.ApiResponse;
 import org.wso2.carbon.usage.data.collector.common.publisher.api.model.UsageCount;
+import org.wso2.carbon.usage.data.collector.common.util.MetaInfoHolder;
 import org.wso2.carbon.usage.data.collector.common.util.UsageDataUtil;
 import org.wso2.carbon.usage.data.collector.identity.util.AppCredentialsUtil;
 import org.wso2.carbon.utils.httpclient5.HTTPClientUtils;
 
 import java.nio.charset.StandardCharsets;
-
-import static org.wso2.carbon.usage.data.collector.identity.util.UsageCollectorConstants.PRODUCT;
 
 /**
  *  HTTP Client related class.
@@ -56,6 +55,7 @@ public class HTTPClient {
 
     public ApiResponse executeApiRequest(ApiRequest request, String endpoint, String endpointLabel) {
 
+        // TODO: add API request headers and query params
         int timeout = request.getTimeoutMs() > 0 ? request.getTimeoutMs() : DEFAULT_TIMEOUT_MS;
         try {
             HttpPost httpPost = new HttpPost(endpoint);
@@ -63,6 +63,7 @@ public class HTTPClient {
             httpPost.setHeader("Content-Type", "application/json");
             httpPost.setHeader("Accept", "application/json");
             httpPost.setEntity(new StringEntity(request.getData().toJson(), StandardCharsets.UTF_8));
+            // TODO: only needed for the internal call, for external we need to use the token
             setAuthorizationHeader(httpPost);
             try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
                 int statusCode = response.getCode();
@@ -92,8 +93,9 @@ public class HTTPClient {
      */
     public static ApiRequest createUsageDataRequest(int count, String type) {
 
-        String nodeId = UsageDataUtil.getNodeIpAddress();
-        UsageCount data = new UsageCount(nodeId, PRODUCT, count, type);
+        String nodeId = MetaInfoHolder.getNodeId();
+        String product = MetaInfoHolder.getProduct();
+        UsageCount data = new UsageCount(nodeId, product, count, type);
         return new ApiRequest.Builder()
                 .withEndpoint("usage-counts")
                 .withData(data)

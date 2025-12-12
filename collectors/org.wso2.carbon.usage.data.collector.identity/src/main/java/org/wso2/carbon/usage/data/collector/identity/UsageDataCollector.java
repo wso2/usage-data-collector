@@ -34,6 +34,8 @@ import org.wso2.carbon.user.api.Tenant;
 import org.wso2.carbon.user.core.service.RealmService;
 import org.wso2.carbon.user.core.tenant.TenantManager;
 
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -81,6 +83,11 @@ public class UsageDataCollector {
 
         SystemUsage usage = new SystemUsage();
 
+        long startTime = System.currentTimeMillis();
+        LOG.info("========== Starting System Statistics Collection ==========");
+        LOG.info("Start Time (UTC): " +
+                ZonedDateTime.now(ZoneOffset.UTC).format(
+                        java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         try {
             TenantManager tenantManager = realmService.getTenantManager();
             Tenant[] tenants = tenantManager.getAllTenants();
@@ -135,7 +142,34 @@ public class UsageDataCollector {
             }
         }
 
+        // End time and duration
+        long endTime = System.currentTimeMillis();
+        long duration = endTime - startTime;
+
+        LOG.info("========== Collection Completed ==========");
+        LOG.info("End Time (UTC): " +
+                ZonedDateTime.now(ZoneOffset.UTC).format(
+                        java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        LOG.info(String.format("Total Duration: %s", formatDuration(duration)));
+        LOG.info(String.format("Total Duration in milli-seconds: %s", duration));
+        LOG.info(String.format("Results - Root Tenants: %d | B2B Orgs: %d | Users: %d",
+                usage.getRootTenantCount(), usage.getTotalB2BOrganizations(), usage.getTotalUsers()));
+
         return usage;
+    }
+
+    private String formatDuration(long millis) {
+        long seconds = millis / 1000;
+        long minutes = seconds / 60;
+        long hours = minutes / 60;
+
+        if (hours > 0) {
+            return String.format("%dh %dm %ds", hours, minutes % 60, seconds % 60);
+        } else if (minutes > 0) {
+            return String.format("%dm %ds", minutes, seconds % 60);
+        } else {
+            return String.format("%ds", seconds);
+        }
     }
 
     /**
