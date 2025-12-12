@@ -16,15 +16,19 @@
  * under the License.
  */
 
-package org.wso2.carbon.usage.data.collector.identity.util;
+package org.wso2.carbon.usage.data.collector.common.receiver;
 
 /**
- * Constants related to usage collection.
+ * Exception thrown when receiver process usage data.
  */
-public class UsageCollectorConstants {
+public class ReceiverException extends Exception {
 
-    private UsageCollectorConstants() {}
+    public ReceiverException(String message) {
+        super(message);
+    }
 
-    public static final String USERNAME_CLAIM = "http://wso2.org/claims/username";
-
+    public ReceiverException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }
+

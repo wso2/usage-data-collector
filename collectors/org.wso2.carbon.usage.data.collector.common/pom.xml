@@ -120,6 +120,7 @@
                             !org.wso2.carbon.usage.data.collector.common.internal.*,
                             org.wso2.carbon.usage.data.collector.common.collector.*;version="${project.version}",
                             org.wso2.carbon.usage.data.collector.common.publisher.api.*;version="${project.version}",
+                            org.wso2.carbon.usage.data.collector.common.receiver.*;version="${project.version}",
                             org.wso2.carbon.usage.data.collector.common.util.*;version="${project.version}"
                         </Export-Package>
                     </instructions>

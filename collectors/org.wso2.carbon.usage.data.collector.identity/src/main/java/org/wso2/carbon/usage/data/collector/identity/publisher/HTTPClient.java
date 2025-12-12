@@ -18,31 +18,24 @@
 
 package org.wso2.carbon.usage.data.collector.identity.publisher;
 
-import org.apache.axis2.transport.http.HTTPConstants;
-import org.apache.commons.codec.binary.Base64;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hc.client5.http.classic.methods.HttpPost;
-import org.apache.hc.client5.http.classic.methods.HttpUriRequestBase;
-import org.apache.hc.client5.http.config.RequestConfig;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
-import org.apache.hc.core5.http.io.entity.EntityUtils;
-import org.apache.hc.core5.http.io.entity.StringEntity;
-import org.apache.hc.core5.util.Timeout;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.wso2.carbon.usage.data.collector.common.publisher.api.PublisherException;
 import org.wso2.carbon.usage.data.collector.common.publisher.api.model.ApiRequest;
 import org.wso2.carbon.usage.data.collector.common.publisher.api.model.ApiResponse;
-import org.wso2.carbon.usage.data.collector.common.publisher.api.model.UsageCount;
-import org.wso2.carbon.usage.data.collector.common.util.UsageDataUtil;
-import org.wso2.carbon.usage.data.collector.identity.util.AppCredentialsUtil;
-import org.wso2.carbon.utils.httpclient5.HTTPClientUtils;
 
-import java.nio.charset.StandardCharsets;
-
-import static org.wso2.carbon.usage.data.collector.identity.util.UsageCollectorConstants.PRODUCT;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 /**
- *  HTTP Client related class.
+ * HTTP Client related class.
  */
 public class HTTPClient {
 
@@ -51,81 +44,123 @@ public class HTTPClient {
     private static final CloseableHttpClient httpClient;
 
     static {
-        httpClient = HTTPClientUtils.createClientWithCustomHostnameVerifier().build();
+        httpClient = HttpClients.createDefault();
     }
 
-    public ApiResponse executeApiRequest(ApiRequest request, String endpoint, String endpointLabel) {
+    /**
+     * Sends HTTP POST request to the specified URL.
+     */
+    public ApiResponse sendHttpRequest(String url, ApiRequest request) throws IOException {
 
-        int timeout = request.getTimeoutMs() > 0 ? request.getTimeoutMs() : DEFAULT_TIMEOUT_MS;
-        try {
-            HttpPost httpPost = new HttpPost(endpoint);
-            httpPost.setConfig(buildRequestConfig(timeout));
-            httpPost.setHeader("Content-Type", "application/json");
-            httpPost.setHeader("Accept", "application/json");
-            httpPost.setEntity(new StringEntity(request.getData().toJson(), StandardCharsets.UTF_8));
-            setAuthorizationHeader(httpPost);
-            try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
-                int statusCode = response.getCode();
-                String responseBody = response.getEntity() != null ?
-                        EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8) : "";
+        org.apache.http.client.methods.HttpPost httpPost = getHttpPost(url, request);
 
-                if (statusCode >= 200 && statusCode < 300) {
-                    return ApiResponse.success(statusCode, responseBody);
-                } else {
-                    return ApiResponse.failure(statusCode, "HTTP error: " + statusCode);
+        // Set request body based on Content-Type
+        if (request.getData() != null) {
+            setRequestEntity(httpPost, request);
+        }
+
+        // Execute request with automatic resource cleanup using try-with-resources
+        try (org.apache.http.client.methods.CloseableHttpResponse httpResponse = httpClient.execute(httpPost)) {
+            int statusCode = httpResponse.getStatusLine().getStatusCode();
+            String responseBody = httpResponse.getEntity() != null ?
+                    org.apache.http.util.EntityUtils.toString(httpResponse.getEntity(), "UTF-8") :
+                    "";
+
+            // Create ApiResponse based on status code
+            ApiResponse response;
+            if (statusCode >= 200 && statusCode < 300) {
+                response = ApiResponse.success(statusCode, responseBody);
+            } else {
+                response = ApiResponse.failure(statusCode, responseBody);
+            }
+
+            // Copy response headers to ApiResponse
+            org.apache.http.Header[] headers = httpResponse.getAllHeaders();
+            if (headers != null && headers.length > 0) {
+                for (org.apache.http.Header header : headers) {
+                    response.addHeader(header.getName(), header.getValue());
                 }
             }
-        } catch (Exception e) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Failed to call " + endpointLabel + " at " + endpoint, e);
-            }
-            return ApiResponse.failure(500, e.getMessage());
+
+            return response;
         }
     }
 
     /**
-     * Creates an ApiRequest for usage data with full customization.
+     * Sets the request entity based on the Content-Type header.
+     * Supports application/json and application/x-www-form-urlencoded.
+     * Handles UsageData subclasses (DeploymentInformation, MetaInformation, UsageCount) and Map objects.
      *
-     * @param count The count value
-     * @param type  The type of usage data
-     * @return ApiRequest object
+     * @param httpPost HttpPost request to set the entity on
+     * @param request  ApiRequest containing the data and headers
+     * @throws UnsupportedEncodingException if encoding fails
      */
-    public static ApiRequest createUsageDataRequest(int count, String type) {
+    private void setRequestEntity(org.apache.http.client.methods.HttpPost httpPost, ApiRequest request)
+            throws UnsupportedEncodingException {
 
-        String nodeId = UsageDataUtil.getNodeIpAddress();
-        UsageCount data = new UsageCount(nodeId, PRODUCT, count, type);
-        return new ApiRequest.Builder()
-                .withEndpoint("usage-counts")
-                .withData(data)
-                .build();
-    }
+        String contentType = getContentType(request);
+        Object data = request.getData();
 
-    private RequestConfig buildRequestConfig(int timeoutMs) {
+        Gson gson = new GsonBuilder().create();
 
-        Timeout timeout = Timeout.ofMilliseconds(timeoutMs);
-        return RequestConfig.custom()
-                .setConnectTimeout(timeout)
-                .setConnectionRequestTimeout(timeout)
-                .setResponseTimeout(timeout)
-                .build();
-    }
+        if (contentType.contains("application/json")) {
+            // Create JSON entity - Gson handles all object types
+            String jsonPayload = gson.toJson(data);
+            httpPost.setEntity(new org.apache.http.entity.StringEntity(jsonPayload,
+                    org.apache.http.entity.ContentType.APPLICATION_JSON));
 
-    private void setAuthorizationHeader(HttpUriRequestBase httpMethod) {
+        } else if (contentType.contains("application/x-www-form-urlencoded")) {
+            // Create URL-encoded form entity
+            Map<String, Object> dataFields = (data instanceof Map)
+                    ? (Map<String, Object>) data
+                    : gson.fromJson(gson.toJson(data), Map.class);
 
-        AppCredentialsUtil credentialsUtil = AppCredentialsUtil.getInstance();
-
-        if (!credentialsUtil.hasCredentials()) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("No authorization credentials configured, skipping auth header");
+            List<org.apache.http.NameValuePair> params = new ArrayList<>();
+            for (Map.Entry<String, Object> entry : dataFields.entrySet()) {
+                params.add(new org.apache.http.message.BasicNameValuePair(
+                        entry.getKey(), String.valueOf(entry.getValue())));
             }
-            return;
+            httpPost.setEntity(new org.apache.http.client.entity.UrlEncodedFormEntity(params, "UTF-8"));
+
+        } else {
+            // Default to JSON if content type is not recognized
+            String jsonPayload = gson.toJson(data);
+            httpPost.setEntity(new org.apache.http.entity.StringEntity(jsonPayload,
+                    org.apache.http.entity.ContentType.APPLICATION_JSON));
         }
-        String appName = credentialsUtil.getAppName();
-        char[] appPasswordChars = credentialsUtil.getAppPassword();
-        String toEncode = appName + ":" + new String(appPasswordChars);
-        byte[] encoding = Base64.encodeBase64(toEncode.getBytes());
-        String authHeader = new String(encoding, StandardCharsets.UTF_8);
-        String CLIENT = "Client ";
-        httpMethod.addHeader(HTTPConstants.HEADER_AUTHORIZATION, CLIENT + authHeader);
+    }
+
+    /**
+     * Extracts the Content-Type from the request headers. Defaults to "application/json" if not specified.
+     *
+     * @param request ApiRequest containing headers
+     * @return Content-Type value
+     */
+    private String getContentType(ApiRequest request) {
+        if (request.getHeaders() != null) {
+            for (Map.Entry<String, String> header : request.getHeaders().entrySet()) {
+                if ("Content-Type".equalsIgnoreCase(header.getKey())) {
+                    return header.getValue();
+                }
+            }
+        }
+        return "application/json"; // Default to JSON
+    }
+
+    /**
+     * Create HttpPost with headers from request
+     */
+    private org.apache.http.client.methods.HttpPost getHttpPost(String url, ApiRequest request) {
+        org.apache.http.client.methods.HttpPost httpPost =
+                new org.apache.http.client.methods.HttpPost(url);
+
+        // Set custom headers from request
+        if (request.getHeaders() != null) {
+            for (Map.Entry<String, String> header : request.getHeaders().entrySet()) {
+                httpPost.setHeader(header.getKey(), header.getValue());
+            }
+        }
+
+        return httpPost;
     }
 }

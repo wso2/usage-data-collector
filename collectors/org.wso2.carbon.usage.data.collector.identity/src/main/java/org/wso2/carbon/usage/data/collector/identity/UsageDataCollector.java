@@ -22,13 +22,13 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.wso2.carbon.identity.organization.management.service.OrganizationManager;
 import org.wso2.carbon.usage.data.collector.common.publisher.api.model.ApiRequest;
-import org.wso2.carbon.usage.data.collector.common.publisher.api.model.ApiResponse;
+import org.wso2.carbon.usage.data.collector.common.publisher.api.model.UsageCount;
+import org.wso2.carbon.usage.data.collector.common.util.MetaInfoHolder;
 import org.wso2.carbon.usage.data.collector.identity.counter.OrganizationCounter;
 import org.wso2.carbon.usage.data.collector.identity.counter.UserCounter;
 import org.wso2.carbon.usage.data.collector.identity.internal.UsageDataCollectorDataHolder;
 import org.wso2.carbon.usage.data.collector.identity.model.SystemUsage;
 import org.wso2.carbon.usage.data.collector.identity.model.TenantUsage;
-import org.wso2.carbon.usage.data.collector.identity.publisher.HTTPClient;
 import org.wso2.carbon.usage.data.collector.identity.publisher.PublisherImp;
 import org.wso2.carbon.user.api.Tenant;
 import org.wso2.carbon.user.core.service.RealmService;
@@ -71,7 +71,6 @@ public class UsageDataCollector {
 
         SystemUsage report = this.collectSystemStatistics();
         publishUsageMetrics(report);
-        publish(report);
     }
 
     /**
@@ -161,25 +160,6 @@ public class UsageDataCollector {
         return stats;
     }
 
-    // Todo: Need to remove this logic after implementing publisher.
-    private void publish(SystemUsage report) {
-
-        if (report == null) {
-            LOG.warn("No statistics report available");
-            return;
-        }
-
-        LOG.info("\n" +
-                "╔════════════════════════════════════════════════════════════╗\n" +
-                "║           USAGE STATISTICS REPORT                          ║\n" +
-                "╠════════════════════════════════════════════════════════════╣\n" +
-                String.format("║ Root Tenant Count:        %-28d ║\n", report.getRootTenantCount()) +
-                String.format("║ Total B2B Organizations:  %-28d ║\n", report.getTotalB2BOrganizations()) +
-                String.format("║ Total Users:              %-28d ║\n", report.getTotalUsers()) +
-                "╚════════════════════════════════════════════════════════════╝"
-        );
-    }
-
     private void publishUsageMetrics(SystemUsage report) {
 
         publishMetric(report.getTotalUsers(), TOTAL_USERS);
@@ -189,21 +169,13 @@ public class UsageDataCollector {
 
     private void publishMetric(int count, String type) {
 
-        try {
-            ApiRequest request = HTTPClient.createUsageDataRequest(count, type);
-            ApiResponse response = publisher.callReceiverApi(request);
-
-            if (LOG.isDebugEnabled()) {
-                if (response.isSuccess()) {
-                    LOG.debug("Published " + type + ": " + count);
-                } else {
-                    LOG.debug("Failed to publish " + type + ": " + response.getErrorMessage());
-                }
-            }
-        } catch (Exception e) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Failed to publish " + type, e);
-            }
-        }
+        String nodeId = MetaInfoHolder.getNodeId();
+        String product = MetaInfoHolder.getProduct();
+        UsageCount data = new UsageCount(nodeId, product, count, type);
+        ApiRequest request =  new ApiRequest.Builder()
+                .withEndpoint("usage-counts")
+                .withData(data)
+                .build();
+        publisher.callReceiverApi(request);
     }
 }

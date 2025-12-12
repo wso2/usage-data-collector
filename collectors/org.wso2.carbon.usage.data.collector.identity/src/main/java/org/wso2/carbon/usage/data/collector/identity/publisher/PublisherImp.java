@@ -20,15 +20,15 @@ package org.wso2.carbon.usage.data.collector.identity.publisher;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.wso2.carbon.base.MultitenantConstants;
-import org.wso2.carbon.identity.core.ServiceURLBuilder;
-import org.wso2.carbon.identity.core.URLBuilderException;
 import org.wso2.carbon.identity.core.util.IdentityDatabaseUtil;
 import org.wso2.carbon.usage.data.collector.common.publisher.api.Publisher;
 import org.wso2.carbon.usage.data.collector.common.publisher.api.PublisherException;
 import org.wso2.carbon.usage.data.collector.common.publisher.api.model.*;
+import org.wso2.carbon.usage.data.collector.common.receiver.Receiver;
+import org.wso2.carbon.usage.data.collector.identity.internal.UsageDataCollectorDataHolder;
 
 import javax.sql.DataSource;
+import java.io.IOException;
 
 /**
  * Publisher implementation.
@@ -36,8 +36,6 @@ import javax.sql.DataSource;
 public class PublisherImp implements Publisher {
 
     private static final Log LOG = LogFactory.getLog(PublisherImp.class);
-    private static final String RECEIVER_ENDPOINT = "/usage/data/receiver";
-    private static final String WSO2_ENDPOINT = "https://api.choreo.dev/test";
 
     @Override
     public DataSource getDataSource() {
@@ -46,56 +44,47 @@ public class PublisherImp implements Publisher {
     }
 
     @Override
-    public ApiResponse callReceiverApi(ApiRequest request) throws PublisherException {
+    public ApiResponse callReceiverApi(ApiRequest request) {
 
-        String endpoint = getEndpoint(request);
-        return new HTTPClient().executeApiRequest(request, endpoint, "receiver API");
+        if (request == null || request.getData() == null) {
+            return ApiResponse.failure(400, "Invalid request");
+        }
+
+        Receiver receiver = UsageDataCollectorDataHolder.getInstance().getReceiver();
+        if (receiver == null) {
+            return ApiResponse.failure(500, "Receiver is not available");
+        }
+
+        try {
+            Object data = request.getData();
+
+            if (data instanceof UsageCount) {
+                receiver.processUsageData((UsageCount) data);
+            } else if (data instanceof DeploymentInformation) {
+                receiver.processDeploymentInformationData((DeploymentInformation) data);
+            } else if (data instanceof MetaInformation) {
+                receiver.processMetaInformationData((MetaInformation) data);
+            } else {
+                throw new PublisherException("Unsupported data type: " + data.getClass().getSimpleName());
+            }
+            return ApiResponse.success(200, "Success");
+        } catch (Exception e) {
+            return ApiResponse.failure(500, e.getMessage());
+        }
     }
 
     @Override
-    public ApiResponse callWso2Api(ApiRequest request) throws PublisherException {
-
-        String endpoint = getWSO2Endpoint(request);
-        return new HTTPClient().executeApiRequest(request, endpoint, "WSO2 API");
-    }
-
-    private static String getEndpoint(ApiRequest request) {
-
-        String endpoint = getReceiverEndpoint();
-        if (request.getData() instanceof UsageCount) {
-            endpoint += "/usage-counts";
-        } else if (request.getData() instanceof DeploymentInformation) {
-            endpoint += "/deployment-information";
-        } else if (request.getData() instanceof MetaInformation) {
-            endpoint += "/meta-information";
-        } else if (request.getEndpoint() != null && !request.getEndpoint().isEmpty()) {
-            endpoint += "/" + request.getEndpoint();
-        }
-        return endpoint;
-    }
-
-    private static String getReceiverEndpoint() {
+    public ApiResponse callExternalApi(ApiRequest request) throws PublisherException {
 
         try {
-            return ServiceURLBuilder.create()
-                    .addPath(RECEIVER_ENDPOINT)
-                    .setTenant(MultitenantConstants.SUPER_TENANT_DOMAIN_NAME)
-                    .build()
-                    .getAbsoluteInternalURL();
-        } catch (URLBuilderException e) {
-           if(LOG.isDebugEnabled()) {
-               LOG.debug(e.getMessage(), e);
-           }
-           return "";
+            return new HTTPClient().sendHttpRequest(request.getEndpoint(), request);
+        } catch (IOException e) {
+            String errorMsg = "WSO2 API call failed: " + e.getMessage();
+            if (LOG.isDebugEnabled()) {
+                LOG.debug(errorMsg, e);
+            }
+            // Return failure response instead of throwing exception
+            return ApiResponse.failure(500, errorMsg);
         }
-    }
-
-    private static String getWSO2Endpoint(ApiRequest request) {
-
-        String endpoint = WSO2_ENDPOINT;
-        if (request.getEndpoint() != null && !request.getEndpoint().isEmpty()) {
-            endpoint = request.getEndpoint();
-        }
-        return endpoint;
     }
 }

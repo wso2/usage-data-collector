@@ -32,6 +32,7 @@ import org.osgi.service.component.annotations.ReferencePolicy;
 import org.wso2.carbon.core.clustering.api.CoordinatedActivity;
 import org.wso2.carbon.identity.organization.management.service.OrganizationManager;
 import org.wso2.carbon.usage.data.collector.identity.UsageDataCollector;
+import org.wso2.carbon.usage.data.collector.identity.UsageDataCollectorScheduler;
 import org.wso2.carbon.usage.data.collector.identity.UsageDataCollectorTask;
 import org.wso2.carbon.usage.data.collector.identity.publisher.PublisherImp;
 import org.wso2.carbon.usage.data.collector.identity.util.ClusteringUtil;
@@ -65,6 +66,7 @@ public class UsageDataCollectorServiceComponent {
     private ScheduledFuture<?> scheduledTask;
     private BundleContext bundleContext;
     private ServiceRegistration<?> publisherServiceRegistration;
+    private UsageDataCollectorScheduler schedulerNew;
 
     @Activate
     protected void activate(ComponentContext context) {
@@ -126,6 +128,11 @@ public class UsageDataCollectorServiceComponent {
             }
         }
 
+        // Stop scheduler
+        if (schedulerNew != null) {
+            schedulerNew.stopScheduledTask();
+        }
+
         if (publisherServiceRegistration != null) {
             try {
                 publisherServiceRegistration.unregister();
@@ -175,11 +182,30 @@ public class UsageDataCollectorServiceComponent {
             unbind = "unsetConfigurationContextService"
     )
     protected void setConfigurationContextService(ConfigurationContextService configContextService) {
+
         UsageDataCollectorDataHolder.getInstance().setConfigurationContextService(configContextService);
     }
 
     protected void unsetConfigurationContextService(ConfigurationContextService configContextService) {
+
         UsageDataCollectorDataHolder.getInstance().setConfigurationContextService(null);
+    }
+
+    @Reference(
+            name = "receiver",
+            service = org.wso2.carbon.usage.data.collector.common.receiver.Receiver.class,
+            cardinality = ReferenceCardinality.MANDATORY,
+            policy = ReferencePolicy.DYNAMIC,
+            unbind = "unsetReceiver"
+    )
+    protected void setReceiver(org.wso2.carbon.usage.data.collector.common.receiver.Receiver receiver) {
+
+        UsageDataCollectorDataHolder.getInstance().setReceiver(receiver);
+    }
+
+    protected void unsetReceiver(org.wso2.carbon.usage.data.collector.common.receiver.Receiver receiver) {
+
+        UsageDataCollectorDataHolder.getInstance().setReceiver(null);
     }
 
     /**
@@ -223,17 +249,19 @@ public class UsageDataCollectorServiceComponent {
 
     private void runUsageCollectionTask() {
 
-        scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread thread = new Thread(r, "IS-UsageDataCollector-Thread");
-            thread.setDaemon(true);
-            return thread;
-        });
-
-        scheduledTask = scheduler.scheduleAtFixedRate(
-                new UsageDataCollectorTask(collectorService),
-                INITIAL_DELAY_SECONDS,
-                INTERVAL_SECONDS,
-                TimeUnit.SECONDS
-        );
+//        scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+//            Thread thread = new Thread(r, "IS-UsageDataCollector-Thread");
+//            thread.setDaemon(true);
+//            return thread;
+//        });
+//
+//        scheduledTask = scheduler.scheduleAtFixedRate(
+//                new UsageDataCollectorTask(collectorService),
+//                INITIAL_DELAY_SECONDS,
+//                INTERVAL_SECONDS,
+//                TimeUnit.SECONDS
+//        );
+        schedulerNew = new UsageDataCollectorScheduler(collectorService);
+        schedulerNew.startScheduledTask();
     }
 }
